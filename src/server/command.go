@@ -4,10 +4,10 @@ type command struct {
 	Method   string
 	Meta     metaData
 	Channels []string
-	FileInfo fileMeta
-	sender   *client
+	FileInfo file
 }
 
 type metaData struct {
-	HasFile bool
+	HasFileContent bool
+	SenderAddress  string
 }

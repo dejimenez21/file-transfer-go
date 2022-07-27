@@ -16,7 +16,7 @@ func deserializeCommand(commandString string) (cmd command, err error) {
 		return
 	}
 	channels := strings.Split(args[2], ",")
-	var finfo fileMeta
+	var finfo file
 	err = json.Unmarshal([]byte(args[3]), &finfo)
 	if err != nil {
 		err = fmt.Errorf("file metadata section has invalid format: %v", err)

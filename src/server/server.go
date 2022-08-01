@@ -13,12 +13,15 @@ const (
 )
 
 type server struct {
-	channels         map[string]channel
-	connectedClients []client
+	channels map[string]channel
+	// connectedClients []client
 }
 
+// TODO: Compress the files
 func (s *server) startServer(port int) {
+	s.channels = make(map[string]channel)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	fmt.Printf("listening on port %d\n", port)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,7 +40,7 @@ func (s *server) startServer(port int) {
 func (s *server) newClient(conn net.Conn) {
 	log.Println("Client connected from", conn.RemoteAddr())
 	cmdChan := make(chan command)
-	newClient := client{conn: conn, cmdChan: cmdChan}
+	newClient := client{conn: conn}
 	go func(ch <-chan command) {
 		for {
 			cmd := <-ch

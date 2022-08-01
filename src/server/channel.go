@@ -15,7 +15,7 @@ func (c *channel) addClient(newClient client) {
 }
 
 func (c *channel) broadcast(cmd command) {
-	var clients []client
+	clients := make([]client, len(c.suscribedClients))
 	copy(clients, c.suscribedClients)
 	cftpBytes, err := serializeDelivery(cmd)
 	if err != nil {

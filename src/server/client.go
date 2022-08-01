@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"log"
 	"net"
+	"strings"
 )
 
 type client struct {
-	conn    net.Conn
-	cmdChan chan command
+	conn net.Conn
+	// cmdChan chan command
 }
 
 func (c *client) readCommand(cmdChn chan command) {
@@ -18,8 +19,8 @@ func (c *client) readCommand(cmdChn chan command) {
 			log.Printf("Error reading message from: %v", c.conn.RemoteAddr())
 			return
 		}
-
-		cmd, err := deserializeCommand(string(data))
+		stringCmd := string(data)
+		cmd, err := deserializeCommand(strings.TrimSuffix(stringCmd, "\x04"))
 		if err != nil {
 			log.Printf("Error deserializing message: %v", err)
 		}

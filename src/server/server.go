@@ -64,17 +64,19 @@ func (s *server) handleSuscribe(suscriber *client, cmd command) {
 	for _, cn := range cmd.Channels {
 		chn, found := s.channels[cn]
 		if found {
-			chn.suscribedClients = append(chn.suscribedClients, *suscriber)
+			chn.addClient(suscriber)
 		} else {
-			newChn := channel{name: cn, suscribedClients: []client{*suscriber}}
+			newChn := channel{name: cn, suscribedClients: []*client{suscriber}}
 			s.channels[cn] = newChn
+			log.Printf("New channel: %s", cn)
 		}
+		log.Printf("Client %s just suscribed to channel %s", (*suscriber).conn.RemoteAddr().String(), cn)
 	}
 }
 
 func (s *server) handleSend(sender *client, cmd command) {
-
-	cmd.Meta.SenderAddress = sender.conn.RemoteAddr().String()
+	senderAddress := sender.conn.RemoteAddr().String()
+	cmd.Meta.SenderAddress = senderAddress
 	for _, destChannel := range cmd.Channels {
 		chn, found := s.channels[destChannel]
 		if !found {

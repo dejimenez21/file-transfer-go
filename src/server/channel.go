@@ -7,15 +7,16 @@ import (
 
 type channel struct {
 	name             string
-	suscribedClients []client
+	suscribedClients []*client
 }
 
-func (c *channel) addClient(newClient client) {
+func (c *channel) addClient(newClient *client) {
 	c.suscribedClients = append(c.suscribedClients, newClient)
 }
 
 func (c *channel) broadcast(cmd command) {
-	clients := make([]client, len(c.suscribedClients))
+	log.Printf("Broadcasting file from %s through %s", cmd.Meta.SenderAddress, c.name)
+	clients := make([]*client, len(c.suscribedClients))
 	copy(clients, c.suscribedClients)
 	cftpBytes, err := serializeDelivery(cmd)
 	if err != nil {
@@ -28,6 +29,7 @@ func (c *channel) broadcast(cmd command) {
 	}
 }
 
-func (c *channel) deliver(cftpBytes []byte, receiver client) {
-	receiver.writeDelivery(cftpBytes)
+func (c *channel) deliver(cftpBytes []byte, receiver *client) {
+	(*receiver).writeDelivery(cftpBytes)
+	log.Printf("Message delivered to %s", (*receiver).conn.RemoteAddr().String())
 }

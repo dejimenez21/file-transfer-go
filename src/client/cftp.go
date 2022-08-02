@@ -28,8 +28,8 @@ func serializeRequest(req request) (cftpBytes []byte, err error) {
 	return
 }
 
-func deserializeRequest(commandString string) (req request, err error) {
-	args := strings.SplitN(commandString, "\n", 4)
+func deserializeRequest(requestString string) (req request, err error) {
+	args := strings.SplitN(requestString, "\n", 4)
 	method := args[0]
 	var meta metaData
 	err = json.Unmarshal([]byte(args[1]), &meta)

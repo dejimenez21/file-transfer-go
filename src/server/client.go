@@ -14,13 +14,13 @@ type client struct {
 
 func (c *client) readCommand(cmdChn chan command) {
 	for {
-		data, err := bufio.NewReader(c.conn).ReadBytes(0x04)
+		data, err := bufio.NewReader(c.conn).ReadBytes(EOT)
 		if err != nil {
 			log.Printf("Error reading message from: %v", c.conn.RemoteAddr())
 			return
 		}
 		stringCmd := string(data)
-		cmd, err := deserializeCommand(strings.TrimSuffix(stringCmd, "\x04"))
+		cmd, err := deserializeCommand(strings.TrimSuffix(stringCmd, string(EOT)))
 		if err != nil {
 			log.Printf("Error deserializing message: %v", err)
 		}
@@ -30,5 +30,6 @@ func (c *client) readCommand(cmdChn chan command) {
 }
 
 func (c *client) writeDelivery(message []byte) {
+	message = append(message, EOT)
 	c.conn.Write(message)
 }

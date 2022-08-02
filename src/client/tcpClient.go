@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 )
 
 type tcpClient struct {
@@ -28,31 +29,29 @@ func (c *tcpClient) sendRequest(req request) {
 	if err != nil {
 		log.Fatalf("Couldn't serialize request: %v", err)
 	}
-	serReq = append(serReq, 0x04)
+	serReq = append(serReq, EOT)
 	_, err = c.conn.Write(serReq)
 	if err != nil {
 		log.Fatalf("Couldn't send request: %v", err)
 	}
 }
 
-func (c *tcpClient) startReceiving(chn chan *request) {
-	for {
-		data, err := bufio.NewReader(c.conn).ReadBytes(0x04)
-		if err != nil {
-			if err != io.EOF {
-				log.Printf("Error reading message from: %v", c.conn.RemoteAddr())
-				return
-			}
-			continue
-		}
+func (c *tcpClient) readInput() (req request) {
 
-		req, err := deserializeRequest(string(data))
-		if err != nil {
-			log.Printf("Error deserializing message: %v", err)
+	data, err := bufio.NewReader(c.conn).ReadBytes(EOT)
+	if err != nil {
+		if err != io.EOF {
+			log.Printf("Error reading message from: %v", c.conn.RemoteAddr())
 		}
-
-		chn <- &req
+		return
 	}
+	stringMsg := string(data)
+	req, err = deserializeRequest(strings.TrimSuffix(stringMsg, string(EOT)))
+	if err != nil {
+		log.Printf("Error deserializing message: %v", err)
+	}
+	return
+	// chn <- &req
 }
 
 // filePath, err := getFilePath()

@@ -9,13 +9,14 @@ import (
 )
 
 const (
-	DEFAULT_RECEIVE_FOLDER_PATH = "C:/Users/dejim/Documents/CFTP-Client/ReceiverFolder/"
-	MAX_FILE_SIZE               = 100 * 1024
-	CMD_SEND                    = "send"
-	CMD_RECEIVE                 = "receive"
-	REQ_SUSCRIBE                = "suscribe"
-	REQ_DELIVER                 = "deliver"
-	REQ_SEND                    = "send"
+	DEFAULT_RECEIVE_FOLDER_PATH      = "C:/Users/dejim/Documents/CFTP-Client/ReceiverFolder/"
+	MAX_FILE_SIZE                    = 100 * 1024
+	EOT                         byte = 0x04
+	CMD_SEND                         = "send"
+	CMD_RECEIVE                      = "receive"
+	REQ_SUSCRIBE                     = "suscribe"
+	REQ_DELIVER                      = "deliver"
+	REQ_SEND                         = "send"
 )
 
 var (
@@ -61,21 +62,22 @@ func handleReceiveCommand(cmd receiveCmd) {
 		Method:   REQ_SUSCRIBE,
 		Channels: cmd.channels,
 	}
-	client.sendRequest(req)
-	fileChn := make(chan *request)
-	go client.startReceiving(fileChn)
 
+	client.sendRequest(req)
+	// fileChn := make(chan *request)
 	for {
-		req := <-fileChn
-		switch req.Method {
+		input := client.readInput()
+
+		// input := *(<-fileChn)
+		switch input.Method {
 		case REQ_DELIVER:
 			fileBroker := fsBroker{path: cmd.folderPath}
-			newFilePath, err := fileBroker.saveFile(req.FileInfo)
+			newFilePath, err := fileBroker.saveFile(input.FileInfo)
 			if err != nil {
 				log.Println(err)
 				continue
 			}
-			fmt.Printf("%s file received from %s throug channel %s saved as %s\n", req.FileInfo.FullName(), req.Meta.SenderAddress, req.Channels[0], newFilePath)
+			fmt.Printf("%s file received from %s throug channel %s saved as %s\n", input.FileInfo.FullName(), input.Meta.SenderAddress, input.Channels[0], newFilePath)
 		}
 	}
 }
@@ -113,23 +115,3 @@ func handleSendCommand(cmd sendCmd) {
 
 	client.sendRequest(req)
 }
-
-// func getFilePath() (path string, err error) {
-// 	args := os.Args
-// 	path = args[1]
-// 	fmt.Println(path)
-// 	return
-// }
-
-// func connect() (conn net.Conn, err error) {
-// 	var d net.Dialer
-// 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-// 	defer cancel()
-
-// 	conn, err = d.DialContext(ctx, "tcp", "localhost:8888")
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-
-// 	return
-// }

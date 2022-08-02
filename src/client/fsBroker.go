@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -14,16 +15,19 @@ type fsBroker struct {
 }
 
 func (b *fsBroker) saveFile(f file) (filePath string, err error) {
+	b.createFolder()
 	if _, err := os.Stat(b.path + f.Name); errors.Is(err, os.ErrNotExist) {
 		filePath = b.path + f.Name
 	} else {
-		filePath = fmt.Sprintf("%s%s_%d", b.path, f.Name, startTime-time.Now().UnixNano())
+		name := strings.TrimSuffix(f.Name, f.Ext)
+		filePath = fmt.Sprintf("%s%s_%d%s", b.path, name, startTime-time.Now().UnixNano(), f.Ext)
 	}
 
 	newFile, err := os.Create(filePath)
 	if err != nil {
 		return filePath, fmt.Errorf("an error occurred while creating the file: %v", err)
 	}
+	defer newFile.Close()
 
 	newFile.Write(f.Content)
 	return
@@ -51,4 +55,8 @@ func (b *fsBroker) getFileSize(filePath string) (size int64, err error) {
 		return 0, fmt.Errorf("error occurred while getting file size: %v", err)
 	}
 	return fileStat.Size(), nil
+}
+
+func (b *fsBroker) createFolder() {
+	os.MkdirAll(b.path, 0700)
 }

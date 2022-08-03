@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	CMD_SEND     = "send"
-	CMD_DELIVER  = "deliver"
-	CMD_SUSCRIBE = "suscribe"
+	CMD_SEND            = "send"
+	CMD_DELIVER         = "deliver"
+	CMD_SUSCRIBE        = "suscribe"
+	DEFAULT_BUFFER_SIZE = 100 * 1024
 )
 
 type server struct {
@@ -40,23 +41,26 @@ func (s *server) startServer(port int) {
 func (s *server) newClient(conn net.Conn) {
 	log.Println("Client connected from", conn.RemoteAddr())
 	cmdChan := make(chan command)
-	newClient := client{conn: conn}
+	contentChan := make(chan []byte)
+	writeChan := make(chan []byte)
+	newClient := client{conn: conn, writeChan: writeChan}
 	go func(ch <-chan command) {
 		for {
 			cmd := <-ch
-			s.handleCommand(&newClient, cmd)
+			s.handleCommand(&newClient, cmd, contentChan)
 		}
 	}(cmdChan)
-	newClient.readCommand(cmdChan)
+	go newClient.startWriter()
+	newClient.readRequest(cmdChan, contentChan)
 }
 
-func (s *server) handleCommand(client *client, cmd command) {
+func (s *server) handleCommand(client *client, cmd command, contentChan <-chan []byte) {
 
 	switch cmd.Method {
 	case CMD_SUSCRIBE:
 		s.handleSuscribe(client, cmd)
 	case CMD_SEND:
-		s.handleSend(client, cmd)
+		s.handleSend(client, cmd, contentChan)
 	}
 }
 
@@ -66,7 +70,7 @@ func (s *server) handleSuscribe(suscriber *client, cmd command) {
 		if found {
 			chn.addClient(suscriber)
 		} else {
-			newChn := channel{name: cn, suscribedClients: []*client{suscriber}}
+			newChn := channel{name: cn, suscribedClients: map[string]*client{suscriber.conn.RemoteAddr().String(): suscriber}}
 			s.channels[cn] = newChn
 			log.Printf("New channel: %s", cn)
 		}
@@ -74,9 +78,10 @@ func (s *server) handleSuscribe(suscriber *client, cmd command) {
 	}
 }
 
-func (s *server) handleSend(sender *client, cmd command) {
+func (s *server) handleSend(sender *client, cmd command, contentChan <-chan []byte) {
 	senderAddress := sender.conn.RemoteAddr().String()
 	cmd.Meta.SenderAddress = senderAddress
+	contentChans := make([]chan []byte, len(cmd.Channels))
 	for _, destChannel := range cmd.Channels {
 		chn, found := s.channels[destChannel]
 		if !found {
@@ -85,10 +90,16 @@ func (s *server) handleSend(sender *client, cmd command) {
 		}
 		deliverCmd := command{
 			Method:   CMD_DELIVER,
-			Meta:     metaData{HasFileContent: true, SenderAddress: sender.conn.RemoteAddr().String()},
+			Meta:     metaData{SenderAddress: sender.conn.RemoteAddr().String()},
 			Channels: []string{destChannel},
 			FileInfo: cmd.FileInfo,
 		}
-		go chn.broadcast(deliverCmd)
+		channelContentChan := make(chan []byte)
+		go chn.broadcast(deliverCmd, channelContentChan)
+		contentChans = append(contentChans, channelContentChan)
+	}
+	content := <-contentChan
+	for _, channel := range contentChans {
+		channel <- content
 	}
 }

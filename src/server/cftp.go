@@ -31,7 +31,7 @@ func deserializeCommand(commandString string) (cmd command, err error) {
 	return cmd, err
 }
 
-func serializeDelivery(cmd command) (cftpBytes []byte, err error) {
+func serializeCommand(cmd command) (cftpBytes []byte, err error) {
 	method := cmd.Method
 	metaBytes, err := json.Marshal(cmd.Meta)
 	if err != nil {
@@ -49,6 +49,14 @@ func serializeDelivery(cmd command) (cftpBytes []byte, err error) {
 
 	cftpString := strings.Join([]string{method, meta, channels, fileInfo}, "\n")
 	cftpBytes = []byte(cftpString)
+	cftpBytes = append(cftpBytes, EOT)
+	return
+}
 
+func serializeChunkDelivery(del delivery) (bytes []byte) {
+	method := "chunk"
+	dataString := strings.Join([]string{method, fmt.Sprint(del.DeliveryId), fmt.Sprint(del.Seq), fmt.Sprint(del.Size)}, "\n")
+	dataString += "\n"
+	bytes = append([]byte(dataString), del.Content...)
 	return
 }

@@ -8,6 +8,5 @@ type command struct {
 }
 
 type metaData struct {
-	HasFileContent bool
-	SenderAddress  string
+	SenderAddress string
 }

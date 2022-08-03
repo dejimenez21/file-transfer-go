@@ -33,6 +33,10 @@ func TestOneToOneTransfer(t *testing.T) {
 	//then
 	actualFileContent, err := ioutil.ReadFile(CLIENTB_DEFAULT_FOLDER + fileName)
 
+	server.Process.Kill()
+	clientB.Process.Kill()
+	clientA.Process.Kill()
+
 	if !reflect.DeepEqual(actualFileContent, expectedFileContent) || err != nil {
 		t.Fatalf("Error: %v", err)
 	}

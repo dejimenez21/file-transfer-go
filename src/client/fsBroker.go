@@ -14,7 +14,7 @@ type fsBroker struct {
 	path string
 }
 
-func (b *fsBroker) saveFile(f file) (filePath string, err error) {
+func (b *fsBroker) saveFile(f file, content []byte) (filePath string, err error) {
 	b.createFolder()
 	if _, err := os.Stat(b.path + f.Name); errors.Is(err, os.ErrNotExist) {
 		filePath = b.path + f.Name
@@ -29,11 +29,11 @@ func (b *fsBroker) saveFile(f file) (filePath string, err error) {
 	}
 	defer newFile.Close()
 
-	newFile.Write(f.Content)
+	newFile.Write(content)
 	return
 }
 
-func (b *fsBroker) loadFile(path string) (f file, err error) {
+func (b *fsBroker) loadFile(path string) (f file, content []byte, err error) {
 	fmt.Println("Getting file", path, "...")
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -42,7 +42,7 @@ func (b *fsBroker) loadFile(path string) (f file, err error) {
 	}
 	f.Name = filepath.Base(path)
 	f.Ext = filepath.Ext(path)
-	f.Content = data
+	content = data
 	return
 }
 

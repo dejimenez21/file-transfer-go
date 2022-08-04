@@ -17,6 +17,8 @@ const (
 	REQ_SUSCRIBE                     = "suscribe"
 	REQ_DELIVER                      = "deliver"
 	REQ_SEND                         = "send"
+	MSG_TYPE_REQ                     = "request"
+	MSG_TYPE_CHUNK                   = "chunk"
 )
 
 var (
@@ -66,18 +68,28 @@ func handleReceiveCommand(cmd receiveCmd) {
 	client.sendRequest(req)
 	// fileChn := make(chan *request)
 	for {
-		input := client.readInput()
+		input, err := client.readInput()
+		if err != nil {
+			log.Printf("error reading input: %v\n", err)
+			continue
+		}
 
 		// input := *(<-fileChn)
-		switch input.Method {
-		case REQ_DELIVER:
-			fileBroker := fsBroker{path: cmd.folderPath}
-			newFilePath, err := fileBroker.saveFile(input.FileInfo)
-			if err != nil {
-				log.Println(err)
-				continue
+		if input.getMessageType() == MSG_TYPE_REQ {
+			req := input.(request)
+			switch req.Method {
+			case REQ_DELIVER:
+				fileBroker := fsBroker{path: cmd.folderPath}
+				newFilePath, err := fileBroker.saveFile(req.FileInfo, req.FileContent)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				fmt.Printf("%s file received from %s throug channel %s saved as %s\n", req.FileInfo.FullName(), req.Meta.SenderAddress, req.Channels[0], newFilePath)
 			}
-			fmt.Printf("%s file received from %s throug channel %s saved as %s\n", input.FileInfo.FullName(), input.Meta.SenderAddress, input.Channels[0], newFilePath)
+		} else if input.getMessageType() == MSG_TYPE_CHUNK {
+			chunk := input.(delivery)
+			chunk.getMessageType()
 		}
 	}
 }
@@ -101,7 +113,7 @@ func handleSendCommand(cmd sendCmd) {
 		log.Fatalf("file size is too large")
 	}
 
-	fInfo, err := fileBroker.loadFile(cmd.filePath)
+	fInfo, fileContent, err := fileBroker.loadFile(cmd.filePath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -114,4 +126,5 @@ func handleSendCommand(cmd sendCmd) {
 	}
 
 	client.sendRequest(req)
+	client.sendFileContent(fileContent)
 }

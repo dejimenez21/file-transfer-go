@@ -81,12 +81,14 @@ func (s *server) handleSuscribe(suscriber *client, cmd command) {
 func (s *server) handleSend(sender *client, cmd command, contentChan <-chan []byte) {
 	senderAddress := sender.conn.RemoteAddr().String()
 	cmd.Meta.SenderAddress = senderAddress
-	contentChans := make([]chan []byte, len(cmd.Channels))
+	// contentChans := make([]chan []byte, len(cmd.Channels))
+	var contentChans []chan []byte
+
 	for _, destChannel := range cmd.Channels {
 		chn, found := s.channels[destChannel]
 		if !found {
 			//TODO: Add functionality to inform the client that channel doesn't exist'
-			return
+			continue
 		}
 		deliverCmd := command{
 			Method:   CMD_DELIVER,
@@ -98,8 +100,12 @@ func (s *server) handleSend(sender *client, cmd command, contentChan <-chan []by
 		go chn.broadcast(deliverCmd, channelContentChan)
 		contentChans = append(contentChans, channelContentChan)
 	}
-	content := <-contentChan
-	for _, channel := range contentChans {
-		channel <- content
+	for i := 0; i < int(cmd.FileInfo.Size); {
+		content := <-contentChan
+		i += len(content)
+		for _, channel := range contentChans {
+			channel <- content
+		}
 	}
+
 }

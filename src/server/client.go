@@ -15,7 +15,8 @@ type client struct {
 
 func (c *client) readRequest(cmdChn chan command, contentChn chan<- []byte) (req command) {
 	for {
-		data, err := bufio.NewReader(c.conn).ReadBytes(EOT)
+		reader := bufio.NewReader(c.conn)
+		data, err := reader.ReadBytes(EOT)
 		if err != nil {
 			log.Printf("Error reading message from: %v", c.conn.RemoteAddr())
 			return
@@ -29,7 +30,7 @@ func (c *client) readRequest(cmdChn chan command, contentChn chan<- []byte) (req
 
 		if cmd.Method == CMD_SEND {
 			for i := 0; i < int(cmd.FileInfo.Size); i += DEFAULT_BUFFER_SIZE {
-				contentData, err := c.readFileContent(DEFAULT_BUFFER_SIZE)
+				contentData, err := c.readFileContent(DEFAULT_BUFFER_SIZE, reader)
 				if err != nil {
 					//TODO: check EOF error
 					log.Printf("an error occurred while reading file content from %s: %v", c.conn.RemoteAddr().String(), err)
@@ -58,9 +59,9 @@ func (c *client) startWriter() {
 
 }
 
-func (c *client) readFileContent(bufSize int) (data []byte, err error) {
+func (c *client) readFileContent(bufSize int, reader *bufio.Reader) (data []byte, err error) {
 	data = make([]byte, bufSize)
-	n, err := c.conn.Read(data)
+	n, err := reader.Read(data)
 	data = data[:n]
 	return
 }

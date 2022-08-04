@@ -36,9 +36,21 @@ func (c *tcpClient) sendRequest(req request) {
 	}
 }
 
-func (c *tcpClient) readInput() (req request) {
+func (c *tcpClient) sendFileContent(content []byte) {
+	_, err := c.conn.Write(content)
+	if err != nil {
+		log.Fatalf("Couldn't send request: %v", err)
+	}
+}
 
-	data, err := bufio.NewReader(c.conn).ReadBytes(EOT)
+func (c *tcpClient) readInput() (msg cftpMessage, err error) {
+	reader := bufio.NewReader(c.conn)
+	// typeIndicator, err := reader.ReadString('\n')
+	// if typeIndicator == "chunk\n" {
+
+	// 	del := deserializeDelivery()
+	// }
+	data, err := reader.ReadBytes(EOT)
 	if err != nil {
 		if err != io.EOF {
 			log.Printf("Error reading message from: %v", c.conn.RemoteAddr())
@@ -46,7 +58,17 @@ func (c *tcpClient) readInput() (req request) {
 		return
 	}
 	stringMsg := string(data)
-	req, err = deserializeRequest(strings.TrimSuffix(stringMsg, string(EOT)))
+
+	if typeIndicator := (strings.SplitN(stringMsg, "\n", 2))[0]; typeIndicator == "chunk" {
+		del, err := deserializeDelivery(stringMsg)
+		if err != nil {
+			return msg, err
+		}
+		del, err = c.readChunk(reader, del)
+		return del, err
+	}
+
+	msg, err = deserializeRequest(strings.TrimSuffix(stringMsg, string(EOT)))
 	if err != nil {
 		log.Printf("Error deserializing message: %v", err)
 	}
@@ -54,20 +76,14 @@ func (c *tcpClient) readInput() (req request) {
 	// chn <- &req
 }
 
-// filePath, err := getFilePath()
-// if err != nil {
-// 	log.Fatal(err)
-// }
-// conn, err := connect()
-// if err != nil {
-// 	os.Exit(1)
-// }
-// defer conn.Close()
-// fileData, err := getFileBytes(filePath)
-// if err != nil {
-// 	os.Exit(1)
-// }
-// _, err = conn.Write(fileData)
-// if err != nil {
-// 	log.Fatal(err)
-// }
+func (c *tcpClient) readChunk(reader *bufio.Reader, del delivery) (result delivery, err error) {
+	data := make([]byte, del.Size)
+	n, err := reader.Read(data)
+	if err != nil {
+		log.Fatal("lost connection with the server")
+	}
+	data = data[:n]
+	result = del
+	result.Content = data
+	return
+}

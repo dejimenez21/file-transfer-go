@@ -56,7 +56,7 @@ func serializeCommand(cmd command) (cftpBytes []byte, err error) {
 func serializeChunkDelivery(del delivery) (bytes []byte) {
 	method := "chunk"
 	dataString := strings.Join([]string{method, fmt.Sprint(del.DeliveryId), fmt.Sprint(del.Seq), fmt.Sprint(del.Size)}, "\n")
-	dataString += "\n"
+	dataString += "\x04"
 	bytes = append([]byte(dataString), del.Content...)
 	return
 }

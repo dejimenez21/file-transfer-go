@@ -74,8 +74,8 @@ func deserializeDelivery(deliveryString string) (del delivery, err error) {
 		err = fmt.Errorf("error deserializing chunk: %v", err)
 		return
 	}
-	del.DeliveryId = int64(deliveryId)
-	del.Seq = int64(seq)
+	del.DeliveryId = deliveryId
+	del.Seq = seq
 	del.Size = size
 
 	return

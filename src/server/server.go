@@ -14,7 +14,8 @@ const (
 )
 
 type server struct {
-	channels map[string]channel
+	channels       map[string]channel
+	requestCounter int64
 	// connectedClients []client
 }
 
@@ -92,7 +93,7 @@ func (s *server) handleSend(sender *client, cmd command, contentChan <-chan []by
 		}
 		deliverCmd := command{
 			Method:   CMD_DELIVER,
-			Meta:     metaData{SenderAddress: sender.conn.RemoteAddr().String()},
+			Meta:     metaData{SenderAddress: sender.conn.RemoteAddr().String(), RequestId: int(s.newRequestId())},
 			Channels: []string{destChannel},
 			FileInfo: cmd.FileInfo,
 		}
@@ -108,4 +109,9 @@ func (s *server) handleSend(sender *client, cmd command, contentChan <-chan []by
 		}
 	}
 
+}
+
+func (s *server) newRequestId() int64 {
+	s.requestCounter++
+	return s.requestCounter
 }

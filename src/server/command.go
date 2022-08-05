@@ -9,4 +9,5 @@ type command struct {
 
 type metaData struct {
 	SenderAddress string
+	RequestId     int
 }

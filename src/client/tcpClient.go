@@ -65,13 +65,14 @@ func (c *tcpClient) readInput() (msg cftpMessage, err error) {
 			return msg, err
 		}
 		del, err = c.readChunk(reader, del)
-		return del, err
+		return &del, err
 	}
 
-	msg, err = deserializeRequest(strings.TrimSuffix(stringMsg, string(EOT)))
+	req, err := deserializeRequest(strings.TrimSuffix(stringMsg, string(EOT)))
 	if err != nil {
 		log.Printf("Error deserializing message: %v", err)
 	}
+	msg = &req
 	return
 	// chn <- &req
 }

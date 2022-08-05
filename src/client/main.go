@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -22,11 +21,15 @@ const (
 )
 
 var (
-	client    = new(tcpClient)
+	fact = new(factory)
+	// client    = new(tcpClient)
 	startTime = time.Now().UnixNano()
 )
 
 func main() {
+	fact.fileBroker = &fsBroker{}
+	client := fact.getTcpClient()
+
 	var channels arrayFlags
 
 	receiveSet := flag.NewFlagSet("receive", flag.ExitOnError)
@@ -42,6 +45,7 @@ func main() {
 	switch method {
 	case CMD_RECEIVE:
 		receiveSet.Parse(os.Args[2:len(os.Args)])
+		fact.fileBroker.path = *receivePath
 		cmd := receiveCmd{channels: channels, folderPath: *receivePath}
 		handleReceiveCommand(cmd)
 	case CMD_SEND:
@@ -57,6 +61,7 @@ func main() {
 }
 
 func handleReceiveCommand(cmd receiveCmd) {
+	client := fact.getTcpClient()
 	if len(cmd.channels) < 1 {
 		log.Fatal("you need to provide at least one channel")
 	}
@@ -66,35 +71,22 @@ func handleReceiveCommand(cmd receiveCmd) {
 	}
 
 	client.sendRequest(req)
-	// fileChn := make(chan *request)
 	for {
 		input, err := client.readInput()
 		if err != nil {
 			log.Printf("error reading input: %v\n", err)
 			continue
 		}
-
-		// input := *(<-fileChn)
-		if input.getMessageType() == MSG_TYPE_REQ {
-			req := input.(request)
-			switch req.Method {
-			case REQ_DELIVER:
-				fileBroker := fsBroker{path: cmd.folderPath}
-				newFilePath, err := fileBroker.saveFile(req.FileInfo, req.FileContent)
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				fmt.Printf("%s file received from %s throug channel %s saved as %s\n", req.FileInfo.FullName(), req.Meta.SenderAddress, req.Channels[0], newFilePath)
-			}
-		} else if input.getMessageType() == MSG_TYPE_CHUNK {
-			chunk := input.(delivery)
-			chunk.getMessageType()
+		err = input.process()
+		if err != nil {
+			log.Println(err)
 		}
 	}
 }
 
 func handleSendCommand(cmd sendCmd) {
+	client := fact.getTcpClient()
+
 	if cmd.filePath == "" {
 		log.Fatal("you need to specify the file to send")
 	}
@@ -120,7 +112,6 @@ func handleSendCommand(cmd sendCmd) {
 	fInfo.Size = fileSize
 	req := request{
 		Method:   REQ_SEND,
-		Meta:     metaData{HasFileContent: true},
 		Channels: cmd.channels,
 		FileInfo: fInfo,
 	}

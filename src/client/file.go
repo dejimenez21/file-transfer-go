@@ -5,7 +5,3 @@ type file struct {
 	Ext  string
 	Size int64
 }
-
-func (f *file) FullName() string {
-	return f.Name + "." + f.Ext
-}

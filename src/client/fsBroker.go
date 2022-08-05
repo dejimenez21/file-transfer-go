@@ -32,6 +32,8 @@ func (b *fsBroker) saveFile(f file, deliveryId int) (newFile *os.File, contentCh
 }
 
 func (b *fsBroker) newDeliveryChannel(deliveryId int) <-chan *delivery {
+	b.contentChansLock.Lock()
+	defer b.contentChansLock.Unlock()
 	if b.contentChans == nil {
 		b.contentChans = make(map[int]chan *delivery)
 	}
@@ -95,8 +97,8 @@ func (b *fsBroker) createFolder() {
 }
 
 func (b *fsBroker) saveChunk(chunk *delivery) (err error) {
-	b.contentChansLock.Lock()
-	defer b.contentChansLock.Unlock()
+	b.contentChansLock.RLock()
+	defer b.contentChansLock.RUnlock()
 
 	contentChan, found := b.contentChans[chunk.DeliveryId]
 	if !found {

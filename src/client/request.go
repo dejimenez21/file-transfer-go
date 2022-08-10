@@ -45,8 +45,9 @@ func (req *request) processDeliver() (err error) {
 		fileBroker := fact.getFileBroker()
 		defer f.Close()
 		var bytesReceived int64 = 0
-		expectedSeq := 1
+		expectedSeq := 0
 		for {
+			expectedSeq++
 			chunk := <-contentChan
 			if chunk.Seq != expectedSeq {
 				log.Printf("chunk of %s file doesn't have the expected sequence, this indicates an inconsistency in the transmission.", f.Name())

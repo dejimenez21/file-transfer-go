@@ -9,7 +9,7 @@ import (
 
 const (
 	DEFAULT_RECEIVE_FOLDER_PATH      = "C:/Users/dejim/Documents/CFTP-Client/ReceiverFolder/"
-	MAX_FILE_SIZE                    = 100 * 1024
+	MAX_FILE_SIZE                    = 1024
 	EOT                         byte = 0x04
 	CMD_SEND                         = "send"
 	CMD_RECEIVE                      = "receive"
@@ -86,6 +86,7 @@ func handleReceiveCommand(cmd receiveCmd) {
 
 func handleSendCommand(cmd sendCmd) {
 	client := fact.getTcpClient()
+	fileBroker := fact.getFileBroker()
 
 	if cmd.filePath == "" {
 		log.Fatal("you need to specify the file to send")
@@ -93,29 +94,23 @@ func handleSendCommand(cmd sendCmd) {
 	if len(cmd.channels) < 1 {
 		log.Fatal("you need to provide at least one channel")
 	}
-	fileBroker := fsBroker{}
 
-	fileSize, err := fileBroker.getFileSize(cmd.filePath)
+	// fileSize, err := fileBroker.getFileSize(cmd.filePath)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	contentChan := make(chan []byte)
+	fInfo, err := fileBroker.loadFile(cmd.filePath, contentChan)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	if fileSize > MAX_FILE_SIZE {
-		//TODO: add logic to handle bigger files
-		log.Fatalf("file size is too large")
-	}
-
-	fInfo, fileContent, err := fileBroker.loadFile(cmd.filePath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fInfo.Size = fileSize
 	req := request{
 		Method:   REQ_SEND,
 		Channels: cmd.channels,
 		FileInfo: fInfo,
 	}
-
 	client.sendRequest(req)
-	client.sendFileContent(fileContent)
+	for content := range contentChan {
+		client.sendFileContent(content)
+	}
 }

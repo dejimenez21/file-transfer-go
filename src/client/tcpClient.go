@@ -9,7 +9,8 @@ import (
 )
 
 type tcpClient struct {
-	conn net.Conn
+	conn   net.Conn
+	reader *bufio.Reader
 }
 
 func (c *tcpClient) establishConnection() {
@@ -44,13 +45,15 @@ func (c *tcpClient) sendFileContent(content []byte) {
 }
 
 func (c *tcpClient) readInput() (msg cftpMessage, err error) {
-	reader := bufio.NewReader(c.conn)
+	if c.reader == nil {
+		c.reader = bufio.NewReader(c.conn)
+	}
 	// typeIndicator, err := reader.ReadString('\n')
 	// if typeIndicator == "chunk\n" {
 
 	// 	del := deserializeDelivery()
 	// }
-	data, err := reader.ReadBytes(EOT)
+	data, err := c.reader.ReadBytes(EOT)
 	if err != nil {
 		if err != io.EOF {
 			log.Printf("Error reading message from: %v", c.conn.RemoteAddr())
@@ -64,7 +67,7 @@ func (c *tcpClient) readInput() (msg cftpMessage, err error) {
 		if err != nil {
 			return msg, err
 		}
-		del, err = c.readChunk(reader, del)
+		del, err = c.readChunk(del)
 		return &del, err
 	}
 
@@ -77,9 +80,9 @@ func (c *tcpClient) readInput() (msg cftpMessage, err error) {
 	// chn <- &req
 }
 
-func (c *tcpClient) readChunk(reader *bufio.Reader, del delivery) (result delivery, err error) {
+func (c *tcpClient) readChunk(del delivery) (result delivery, err error) {
 	data := make([]byte, del.Size)
-	n, err := reader.Read(data)
+	n, err := c.reader.Read(data)
 	if err != nil {
 		log.Fatal("lost connection with the server")
 	}

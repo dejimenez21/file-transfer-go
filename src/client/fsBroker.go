@@ -3,7 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,16 +69,53 @@ func (b *fsBroker) getSavingFileFullName(f file) (filePath string) {
 	return
 }
 
-func (b *fsBroker) loadFile(path string) (f file, content []byte, err error) {
+// func (b *fsBroker) loadFile(path string) (f file, content []byte, err error) {
+// 	fmt.Println("Getting file", path, "...")
+// 	data, err := ioutil.ReadFile(path)
+// 	if err != nil {
+// 		err = fmt.Errorf("an error occurred while reading the file: %v", err)
+// 		return
+// 	}
+// 	f.Name = filepath.Base(path)
+// 	f.Ext = filepath.Ext(path)
+// 	content = data
+// 	return
+// }
+func (b *fsBroker) loadFile(path string, contentChan chan<- []byte) (finfo file, err error) {
 	fmt.Println("Getting file", path, "...")
-	data, err := ioutil.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		err = fmt.Errorf("an error occurred while reading the file: %v", err)
 		return
 	}
-	f.Name = filepath.Base(path)
-	f.Ext = filepath.Ext(path)
-	content = data
+	fStat, err := f.Stat()
+	if err != nil {
+		f.Close()
+		err = fmt.Errorf("an error occurred while reading the file: %v", err)
+		return
+	}
+	finfo.Name = fStat.Name()
+	finfo.Ext = filepath.Ext(fStat.Name())
+	finfo.Size = fStat.Size()
+
+	go func(file *os.File, contentChan chan<- []byte) {
+		for {
+			data := make([]byte, MAX_FILE_SIZE)
+			n, err := file.Read(data)
+			if err != nil && err != io.EOF {
+				log.Printf("error ocurred reading file %s", file.Name())
+				close(contentChan)
+				return
+			}
+			if n < 1 {
+				close(contentChan)
+				return
+			}
+			data = data[:n]
+			contentChan <- data
+		}
+	}(f, contentChan)
+
 	return
 }
 

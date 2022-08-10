@@ -10,7 +10,7 @@ const (
 	CMD_SEND            = "send"
 	CMD_DELIVER         = "deliver"
 	CMD_SUSCRIBE        = "suscribe"
-	DEFAULT_BUFFER_SIZE = 100 * 1024
+	DEFAULT_BUFFER_SIZE = 1024
 )
 
 type server struct {

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"server/cftp"
+	"server/cftp/models"
 )
 
 type channel struct {
@@ -16,10 +18,10 @@ func (c *channel) addClient(newClient *client) {
 	c.suscribedClients[newClient.conn.RemoteAddr().String()] = newClient
 }
 
-func (c *channel) broadcast(cmd command, contentChan chan []byte) {
+func (c *channel) broadcast(cmd models.Command, contentChan chan []byte) {
 	log.Printf("Broadcasting file from %s through %s", cmd.Meta.SenderAddress, c.name)
 	clients := c.copySuscribedClients()
-	cftpBytes, err := serializeCommand(cmd)
+	cftpBytes, err := cftp.SerializeCommand(cmd)
 	if err != nil {
 		err = fmt.Errorf("error serializing %s delivery throug %s for : %v", cmd.FileInfo.Name, c.name, err)
 		log.Println(err)
@@ -30,12 +32,12 @@ func (c *channel) broadcast(cmd command, contentChan chan []byte) {
 		client.writeChan <- cftpBytes
 	}
 	var chunkSeq int64 = 0
-	deliveryID := c.newDeliveryId()
+	deliveryID := models.NewDeliveryId()
 	for {
 		fileContent := <-contentChan
 		chunkSeq++
-		del := delivery{Content: fileContent, ID: deliveryID, Seq: chunkSeq, Size: len(fileContent)}
-		delBytes := serializeChunkDelivery(del)
+		del := models.Delivery{Content: fileContent, ID: deliveryID, Seq: chunkSeq, Size: len(fileContent)}
+		delBytes := cftp.SerializeChunkDelivery(del)
 		for _, client := range clients {
 			client.writeChan <- delBytes
 		}
@@ -49,10 +51,4 @@ func (c *channel) copySuscribedClients() map[string]*client {
 		copy[k] = v
 	}
 	return copy
-}
-
-func (c *channel) newDeliveryId() int64 {
-	//TODO: implement struct member to keep track of ids
-	nextDeliveryID++
-	return nextDeliveryID
 }

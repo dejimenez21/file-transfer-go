@@ -5,6 +5,8 @@ import (
 	"io"
 	"log"
 	"net"
+	"server/cftp"
+	"server/cftp/models"
 	"strings"
 )
 
@@ -14,10 +16,10 @@ type client struct {
 	// cmdChan chan command
 }
 
-func (c *client) readRequest(cmdChn chan command, contentChn chan<- []byte) (req command) {
+func (c *client) readRequest(cmdChn chan models.Command, contentChn chan<- []byte) (req models.Command) {
 	for {
 		reader := bufio.NewReader(c.conn)
-		data, err := reader.ReadBytes(EOT)
+		data, err := reader.ReadBytes(cftp.END_OF_MSG)
 		if err != nil {
 			if err == io.EOF {
 				log.Printf("Client %v disconected", c.conn.RemoteAddr())
@@ -27,7 +29,7 @@ func (c *client) readRequest(cmdChn chan command, contentChn chan<- []byte) (req
 			return
 		}
 		stringCmd := string(data)
-		cmd, err := deserializeCommand(strings.TrimSuffix(stringCmd, string(EOT)))
+		cmd, err := cftp.DeserializeCommand(strings.TrimSuffix(stringCmd, string(cftp.END_OF_MSG)))
 		if err != nil {
 			log.Printf("Error deserializing message: %v", err)
 		}

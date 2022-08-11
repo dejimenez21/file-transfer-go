@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"io"
 	"log"
 	"net"
 	"strings"
@@ -18,7 +19,11 @@ func (c *client) readRequest(cmdChn chan command, contentChn chan<- []byte) (req
 		reader := bufio.NewReader(c.conn)
 		data, err := reader.ReadBytes(EOT)
 		if err != nil {
-			log.Printf("Error reading message from: %v", c.conn.RemoteAddr())
+			if err == io.EOF {
+				log.Printf("Client %v disconected", c.conn.RemoteAddr())
+				return
+			}
+			log.Printf("Error reading message from: %v. Connection closed", c.conn.RemoteAddr())
 			return
 		}
 		stringCmd := string(data)
@@ -39,11 +44,6 @@ func (c *client) readRequest(cmdChn chan command, contentChn chan<- []byte) (req
 			}
 		}
 	}
-}
-
-func (c *client) writeDelivery(message []byte) error {
-	_, err := c.conn.Write(message)
-	return err
 }
 
 func (c *client) startWriter() {

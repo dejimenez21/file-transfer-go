@@ -30,26 +30,17 @@ func (c *channel) broadcast(cmd command, contentChan chan []byte) {
 		client.writeChan <- cftpBytes
 	}
 	var chunkSeq int64 = 0
+	deliveryID := c.newDeliveryId()
 	for {
 		fileContent := <-contentChan
 		chunkSeq++
-		del := delivery{Content: fileContent, DeliveryId: c.newDeliveryId(), Seq: chunkSeq, Size: len(fileContent)}
+		del := delivery{Content: fileContent, ID: deliveryID, Seq: chunkSeq, Size: len(fileContent)}
 		delBytes := serializeChunkDelivery(del)
 		for _, client := range clients {
 			client.writeChan <- delBytes
 		}
 	}
 
-}
-
-func (c *channel) deliver(cftpBytes []byte, receiver *client) {
-	// err := (*receiver).writeDelivery(cftpBytes)
-	// if err != nil {
-	// 	log.Printf("could not deliver to client %s: %v", receiver.conn.RemoteAddr().String(), err)
-	// 	//TODO: add a lock
-	// 	delete(c.suscribedClients, receiver.conn.RemoteAddr().String())
-	// }
-	log.Printf("Message delivered to %s", (*receiver).conn.RemoteAddr().String())
 }
 
 func (c *channel) copySuscribedClients() map[string]*client {
@@ -62,5 +53,6 @@ func (c *channel) copySuscribedClients() map[string]*client {
 
 func (c *channel) newDeliveryId() int64 {
 	//TODO: implement struct member to keep track of ids
-	return 1
+	nextDeliveryID++
+	return nextDeliveryID
 }

@@ -87,6 +87,15 @@ func (c *tcpClient) readChunk(del delivery) (result delivery, err error) {
 		log.Fatal("lost connection with the server")
 	}
 	data = data[:n]
+	if missing := del.Size - n; missing > 0 {
+		missingData := make([]byte, missing)
+		_, err := c.conn.Read(missingData)
+		if err != nil {
+			log.Fatal("lost connection with the server")
+		}
+		data = append(data, missingData...)
+	}
+
 	result = del
 	result.Content = data
 	return

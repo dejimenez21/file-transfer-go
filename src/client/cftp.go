@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -51,4 +52,31 @@ func deserializeRequest(requestString string) (req request, err error) {
 		FileInfo: finfo,
 	}
 	return req, err
+}
+
+func deserializeDelivery(deliveryString string) (del delivery, err error) {
+	del = delivery{}
+	deliveryString = strings.TrimSuffix(deliveryString, "\x04")
+	args := strings.SplitN(deliveryString, "\n", 4)
+
+	deliveryId, err := strconv.Atoi(args[1])
+	if err != nil {
+		err = fmt.Errorf("error deserializing chunk: %v", err)
+		return
+	}
+	seq, err := strconv.Atoi(args[2])
+	if err != nil {
+		err = fmt.Errorf("error deserializing chunk: %v", err)
+		return
+	}
+	size, err := strconv.Atoi(args[3])
+	if err != nil {
+		err = fmt.Errorf("error deserializing chunk: %v", err)
+		return
+	}
+	del.DeliveryId = deliveryId
+	del.Seq = seq
+	del.Size = size
+
+	return
 }

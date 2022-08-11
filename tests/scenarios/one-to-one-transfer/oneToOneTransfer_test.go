@@ -13,7 +13,7 @@ import (
 const (
 	SERVER_EXEC_PATH       = "C:\\Users\\dejim\\source\\repos\\file-transfer-go\\src\\server\\server.exe"
 	CLIENT_EXEC_PATH       = "C:\\Users\\dejim\\source\\repos\\file-transfer-go\\src\\client\\client.exe"
-	CLIENTB_DEFAULT_FOLDER = "./receiverFolder/"
+	CLIENTB_DEFAULT_FOLDER = "C:\\Users\\dejim\\source\\repos\\file-transfer-go\\tests\\scenarios\\one-to-one-transfer\\receiverFolder\\"
 )
 
 func TestOneToOneTransfer(t *testing.T) {
@@ -28,13 +28,17 @@ func TestOneToOneTransfer(t *testing.T) {
 	go server.Run()
 	go clientB.Run()
 	go clientA.Run()
-	time.Sleep(3000000000)
+	time.Sleep(2000000000)
 
 	//then
 	actualFileContent, err := ioutil.ReadFile(CLIENTB_DEFAULT_FOLDER + fileName)
 
+	server.Process.Kill()
+	clientB.Process.Kill()
+	clientA.Process.Kill()
+
 	if !reflect.DeepEqual(actualFileContent, expectedFileContent) || err != nil {
-		t.Fatalf("Error: %v", err)
+		t.Fatalf("Expected: %d, got: %d \nError: %v", len(expectedFileContent), len(actualFileContent), err)
 	}
 
 	cleanup(CLIENTB_DEFAULT_FOLDER + fileName)

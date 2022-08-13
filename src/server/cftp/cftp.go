@@ -1,28 +1,29 @@
-package main
+package cftp
 
 import (
 	"encoding/json"
 	"fmt"
+	"server/cftp/models"
 	"strings"
 )
 
-func deserializeCommand(commandString string) (cmd command, err error) {
+func DeserializeCommand(commandString string) (cmd models.Command, err error) {
 	args := strings.SplitN(commandString, "\n", 4)
 	method := args[0]
-	var meta metaData
+	var meta models.MetaData
 	err = json.Unmarshal([]byte(args[1]), &meta)
 	if err != nil {
 		err = fmt.Errorf("meta section has invalid format: %v", err)
 		return
 	}
 	channels := strings.Split(args[2], ",")
-	var finfo file
+	var finfo models.File
 	err = json.Unmarshal([]byte(args[3]), &finfo)
 	if err != nil {
 		err = fmt.Errorf("file metadata section has invalid format: %v", err)
 		return
 	}
-	cmd = command{
+	cmd = models.Command{
 		Method:   method,
 		Meta:     meta,
 		Channels: channels,
@@ -31,7 +32,7 @@ func deserializeCommand(commandString string) (cmd command, err error) {
 	return cmd, err
 }
 
-func serializeCommand(cmd command) (cftpBytes []byte, err error) {
+func SerializeCommand(cmd models.Command) (cftpBytes []byte, err error) {
 	method := cmd.Method
 	metaBytes, err := json.Marshal(cmd.Meta)
 	if err != nil {
@@ -49,11 +50,11 @@ func serializeCommand(cmd command) (cftpBytes []byte, err error) {
 
 	cftpString := strings.Join([]string{method, meta, channels, fileInfo}, "\n")
 	cftpBytes = []byte(cftpString)
-	cftpBytes = append(cftpBytes, EOT)
+	cftpBytes = append(cftpBytes, END_OF_MSG)
 	return
 }
 
-func serializeChunkDelivery(del delivery) (bytes []byte) {
+func SerializeChunkDelivery(del models.Delivery) (bytes []byte) {
 	method := "chunk"
 	dataString := strings.Join([]string{method, fmt.Sprint(del.ID), fmt.Sprint(del.Seq), fmt.Sprint(del.Size)}, "\n")
 	dataString += "\x04"

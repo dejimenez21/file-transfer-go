@@ -1,6 +1,6 @@
-package main
+package models
 
-type file struct {
+type File struct {
 	Name string
 	Ext  string
 	Size int64

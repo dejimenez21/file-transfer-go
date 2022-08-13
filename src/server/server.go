@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"server/cftp/models"
 )
 
 const (
@@ -41,11 +42,11 @@ func (s *server) startServer(port int) {
 
 func (s *server) newClient(conn net.Conn) {
 	log.Println("Client connected from", conn.RemoteAddr())
-	cmdChan := make(chan command)
+	cmdChan := make(chan models.Command)
 	contentChan := make(chan []byte)
 	writeChan := make(chan []byte)
 	newClient := client{conn: conn, writeChan: writeChan}
-	go func(ch <-chan command) {
+	go func(ch <-chan models.Command) {
 		for {
 			cmd := <-ch
 			s.handleCommand(&newClient, cmd, contentChan)
@@ -55,7 +56,7 @@ func (s *server) newClient(conn net.Conn) {
 	newClient.readRequest(cmdChan, contentChan)
 }
 
-func (s *server) handleCommand(client *client, cmd command, contentChan <-chan []byte) {
+func (s *server) handleCommand(client *client, cmd models.Command, contentChan <-chan []byte) {
 
 	switch cmd.Method {
 	case CMD_SUSCRIBE:
@@ -65,7 +66,7 @@ func (s *server) handleCommand(client *client, cmd command, contentChan <-chan [
 	}
 }
 
-func (s *server) handleSuscribe(suscriber *client, cmd command) {
+func (s *server) handleSuscribe(suscriber *client, cmd models.Command) {
 	for _, cn := range cmd.Channels {
 		chn, found := s.channels[cn]
 		if found {
@@ -79,7 +80,7 @@ func (s *server) handleSuscribe(suscriber *client, cmd command) {
 	}
 }
 
-func (s *server) handleSend(sender *client, cmd command, contentChan <-chan []byte) {
+func (s *server) handleSend(sender *client, cmd models.Command, contentChan <-chan []byte) {
 	senderAddress := sender.conn.RemoteAddr().String()
 	cmd.Meta.SenderAddress = senderAddress
 	// contentChans := make([]chan []byte, len(cmd.Channels))
@@ -91,9 +92,9 @@ func (s *server) handleSend(sender *client, cmd command, contentChan <-chan []by
 			//TODO: Add functionality to inform the client that channel doesn't exist'
 			continue
 		}
-		deliverCmd := command{
+		deliverCmd := models.Command{
 			Method:   CMD_DELIVER,
-			Meta:     metaData{SenderAddress: sender.conn.RemoteAddr().String(), RequestId: int(s.newRequestId())},
+			Meta:     models.MetaData{SenderAddress: sender.conn.RemoteAddr().String(), RequestId: int(s.newRequestId())},
 			Channels: []string{destChannel},
 			FileInfo: cmd.FileInfo,
 		}

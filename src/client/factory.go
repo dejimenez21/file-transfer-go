@@ -3,11 +3,12 @@ package main
 type factory struct {
 	fileBroker *fsBroker
 	client     *tcpClient
+	serverAddr string
 }
 
 func (f *factory) getTcpClient() *tcpClient {
 	if f.client == nil {
-		f.client = &tcpClient{}
+		f.client = &tcpClient{serverAddr: f.serverAddr}
 	}
 	return f.client
 }

@@ -9,8 +9,9 @@ import (
 )
 
 type tcpClient struct {
-	conn   net.Conn
-	reader *bufio.Reader
+	conn       net.Conn
+	reader     *bufio.Reader
+	serverAddr string
 }
 
 func (c *tcpClient) establishConnection() {

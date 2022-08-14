@@ -24,7 +24,8 @@ const (
 var (
 	fact = new(factory)
 	// client    = new(tcpClient)
-	startTime = time.Now().UnixNano()
+	startTime  = time.Now().UnixNano()
+	serverAddr string
 )
 
 func main() {
@@ -37,11 +38,11 @@ func main() {
 	//receiveDetached := receiveCmd.Bool("async", false, "Indicates if the receive operation should run asynchronously.")
 	receivePath := receiveSet.String("path", DEFAULT_RECEIVE_FOLDER_PATH, "Folder where the received files will be stored.")
 	receiveSet.Var(&channels, "ch", "Channel to receive files from.")
-	serverAddr := receiveSet.String("server", DEFAULT_SERVER_ADDR, "Address fo the CFTP server.")
+	receiveServerAddr := receiveSet.String("server", DEFAULT_SERVER_ADDR, "Address fo the CFTP server.")
 
 	sendSet := flag.NewFlagSet("send", flag.ExitOnError)
 	sendSet.Var(&channels, "ch", "Channel to send files to.")
-	serverAddr2 := sendSet.String("server", DEFAULT_SERVER_ADDR, "Address fo the CFTP server.")
+	sendServerAddr := sendSet.String("server", DEFAULT_SERVER_ADDR, "Address fo the CFTP server.")
 
 	method := os.Args[1]
 
@@ -49,14 +50,14 @@ func main() {
 	case CMD_RECEIVE:
 		receiveSet.Parse(os.Args[2:len(os.Args)])
 		fact.fileBroker.path = *receivePath
-		fact.serverAddr = *serverAddr
+		serverAddr = *receiveServerAddr
 		cmd := receiveCmd{channels: channels, folderPath: *receivePath}
 		handleReceiveCommand(cmd)
 	case CMD_SEND:
 		sendSet.Parse(os.Args[2 : len(os.Args)-1])
 		cmd := sendCmd{channels: channels}
 		cmd.filePath = os.Args[len(os.Args)-1]
-		fact.serverAddr = *serverAddr2
+		serverAddr = *sendServerAddr
 		handleSendCommand(cmd)
 	}
 

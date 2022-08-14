@@ -18,7 +18,7 @@ func (c *tcpClient) establishConnection() {
 	if c.conn != nil {
 		return
 	}
-	conn, err := net.Dial("tcp", "localhost:8888")
+	conn, err := net.Dial("tcp", serverAddr)
 	if err != nil {
 		log.Fatalf("Couldn't establish connection: %v", err)
 	}

@@ -13,7 +13,6 @@ import (
 type client struct {
 	conn      net.Conn
 	writeChan chan []byte
-	// cmdChan chan command
 }
 
 func (c *client) readRequest(cmdChn chan models.Command, contentChn chan<- []byte) (req models.Command) {
@@ -36,12 +35,13 @@ func (c *client) readRequest(cmdChn chan models.Command, contentChn chan<- []byt
 		cmdChn <- cmd
 
 		if cmd.Method == CMD_SEND {
-			for i := 0; i < int(cmd.FileInfo.Size); i += DEFAULT_BUFFER_SIZE {
+			for i := 0; i < int(cmd.FileInfo.Size); {
 				contentData, err := c.readFileContent(DEFAULT_BUFFER_SIZE, reader)
 				if err != nil {
 					//TODO: check EOF error
 					log.Printf("an error occurred while reading file content from %s: %v", c.conn.RemoteAddr().String(), err)
 				}
+				i += len(contentData)
 				contentChn <- contentData
 			}
 		}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"io"
 	"log"
 	"net"
 	"server/cftp"
@@ -11,8 +10,9 @@ import (
 )
 
 type client struct {
-	conn      net.Conn
-	writeChan chan []byte
+	conn       net.Conn
+	writeChan  chan []byte
+	disconnect chan<- *client
 }
 
 func (c *client) readRequest(cmdChn chan models.Command, contentChn chan<- []byte) (req models.Command) {
@@ -20,11 +20,8 @@ func (c *client) readRequest(cmdChn chan models.Command, contentChn chan<- []byt
 		reader := bufio.NewReader(c.conn)
 		data, err := reader.ReadBytes(cftp.END_OF_MSG)
 		if err != nil {
-			if err == io.EOF {
-				log.Printf("Client %v disconected", c.conn.RemoteAddr())
-				return
-			}
-			log.Printf("Error reading message from: %v. Connection closed", c.conn.RemoteAddr())
+			log.Printf("Client %v disconected", c.conn.RemoteAddr())
+			c.disconnect <- c
 			return
 		}
 		stringCmd := string(data)
@@ -38,8 +35,9 @@ func (c *client) readRequest(cmdChn chan models.Command, contentChn chan<- []byt
 			for i := 0; i < int(cmd.FileInfo.Size); {
 				contentData, err := c.readFileContent(DEFAULT_BUFFER_SIZE, reader)
 				if err != nil {
-					//TODO: check EOF error
-					log.Printf("an error occurred while reading file content from %s: %v", c.conn.RemoteAddr().String(), err)
+					log.Printf("Client %v disconected", c.conn.RemoteAddr())
+					c.disconnect <- c
+					return
 				}
 				i += len(contentData)
 				contentChn <- contentData

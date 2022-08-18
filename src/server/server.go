@@ -45,13 +45,19 @@ func (s *server) newClient(conn net.Conn) {
 	cmdChan := make(chan models.Command)
 	contentChan := make(chan []byte)
 	writeChan := make(chan []byte)
-	newClient := client{conn: conn, writeChan: writeChan}
-	go func(ch <-chan models.Command) {
+	disconnectChan := make(chan *client)
+	newClient := client{conn: conn, writeChan: writeChan, disconnect: disconnectChan}
+	go func(ch <-chan models.Command, dCh <-chan *client) {
 		for {
-			cmd := <-ch
-			s.handleCommand(&newClient, cmd, contentChan)
+			select {
+			case cmd := <-ch:
+				s.handleCommand(&newClient, cmd, contentChan)
+			case cl := <-dCh:
+				s.disconnectClient(cl)
+			}
+
 		}
-	}(cmdChan)
+	}(cmdChan, disconnectChan)
 	go newClient.startWriter()
 	newClient.readRequest(cmdChan, contentChan)
 }
@@ -115,4 +121,10 @@ func (s *server) handleSend(sender *client, cmd models.Command, contentChan <-ch
 func (s *server) newRequestId() int64 {
 	s.requestCounter++
 	return s.requestCounter
+}
+
+func (s *server) disconnectClient(c *client) {
+	for _, channel := range s.channels {
+		delete(channel.suscribedClients, c.conn.RemoteAddr().String())
+	}
 }

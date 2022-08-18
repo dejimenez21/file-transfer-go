@@ -69,18 +69,6 @@ func (b *fsBroker) getSavingFileFullName(f file) (filePath string) {
 	return
 }
 
-// func (b *fsBroker) loadFile(path string) (f file, content []byte, err error) {
-// 	fmt.Println("Getting file", path, "...")
-// 	data, err := ioutil.ReadFile(path)
-// 	if err != nil {
-// 		err = fmt.Errorf("an error occurred while reading the file: %v", err)
-// 		return
-// 	}
-// 	f.Name = filepath.Base(path)
-// 	f.Ext = filepath.Ext(path)
-// 	content = data
-// 	return
-// }
 func (b *fsBroker) loadFile(path string, contentChan chan<- []byte) (finfo file, err error) {
 	fmt.Println("Getting file", path, "...")
 	f, err := os.Open(path)

@@ -65,14 +65,14 @@ func (req *request) processDeliver() (err error) {
 
 			bytesReceived += int64(n)
 			if bytesReceived >= req.FileInfo.Size {
-				log.Printf("successfully received %s file from %s throug channel %s", req.FileInfo.Name, req.Meta.SenderAddress, req.Channels[0])
+				log.Printf("successfully received %s file from %s through channel %s", req.FileInfo.Name, req.Meta.SenderAddress, req.Channels[0])
 				fileBroker.removeContentChannel(req.Meta.RequestId)
 				return
 			}
 		}
 	}(contentChan, newFile)
 
-	log.Printf("started receiving %s file from %s throug channel %s", req.FileInfo.Name, req.Meta.SenderAddress, req.Channels[0])
+	log.Printf("started receiving %s file from %s through channel %s", req.FileInfo.Name, req.Meta.SenderAddress, req.Channels[0])
 
 	return
 }

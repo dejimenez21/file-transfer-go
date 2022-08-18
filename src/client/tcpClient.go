@@ -9,15 +9,16 @@ import (
 )
 
 type tcpClient struct {
-	conn   net.Conn
-	reader *bufio.Reader
+	conn       net.Conn
+	reader     *bufio.Reader
+	serverAddr string
 }
 
 func (c *tcpClient) establishConnection() {
 	if c.conn != nil {
 		return
 	}
-	conn, err := net.Dial("tcp", "localhost:8888")
+	conn, err := net.Dial("tcp", serverAddr)
 	if err != nil {
 		log.Fatalf("Couldn't establish connection: %v", err)
 	}
@@ -58,6 +59,8 @@ func (c *tcpClient) readInput() (msg cftpMessage, err error) {
 		if err != io.EOF {
 			log.Printf("Error reading message from: %v", c.conn.RemoteAddr())
 		}
+		//TODO: check the right way of checking if connection is closed
+		log.Fatalf("the connection with server was lost: %v", err)
 		return
 	}
 	stringMsg := string(data)
@@ -87,12 +90,16 @@ func (c *tcpClient) readChunk(del delivery) (result delivery, err error) {
 		log.Fatal("lost connection with the server")
 	}
 	data = data[:n]
-	if missing := del.Size - n; missing > 0 {
-		missingData := make([]byte, missing)
-		_, err := c.conn.Read(missingData)
+	missing := del.Size - n
+	for i := 0; i < missing; {
+		missingData := make([]byte, missing-i)
+		nm, err := c.conn.Read(missingData)
 		if err != nil {
+			//TODO: check the right way of checking if connection is closed
 			log.Fatal("lost connection with the server")
 		}
+		i += nm
+		missingData = missingData[:nm]
 		data = append(data, missingData...)
 	}
 

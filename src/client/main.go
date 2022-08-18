@@ -18,12 +18,14 @@ const (
 	REQ_SEND                         = "send"
 	MSG_TYPE_REQ                     = "request"
 	MSG_TYPE_CHUNK                   = "chunk"
+	DEFAULT_SERVER_ADDR              = "localhost:8888"
 )
 
 var (
 	fact = new(factory)
 	// client    = new(tcpClient)
-	startTime = time.Now().UnixNano()
+	startTime  = time.Now().UnixNano()
+	serverAddr string
 )
 
 func main() {
@@ -36,9 +38,11 @@ func main() {
 	//receiveDetached := receiveCmd.Bool("async", false, "Indicates if the receive operation should run asynchronously.")
 	receivePath := receiveSet.String("path", DEFAULT_RECEIVE_FOLDER_PATH, "Folder where the received files will be stored.")
 	receiveSet.Var(&channels, "ch", "Channel to receive files from.")
+	receiveServerAddr := receiveSet.String("server", DEFAULT_SERVER_ADDR, "Address for the CFTP server.")
 
 	sendSet := flag.NewFlagSet("send", flag.ExitOnError)
 	sendSet.Var(&channels, "ch", "Channel to send files to.")
+	sendServerAddr := sendSet.String("server", DEFAULT_SERVER_ADDR, "Address for the CFTP server.")
 
 	method := os.Args[1]
 
@@ -46,12 +50,14 @@ func main() {
 	case CMD_RECEIVE:
 		receiveSet.Parse(os.Args[2:len(os.Args)])
 		fact.fileBroker.path = *receivePath
+		serverAddr = *receiveServerAddr
 		cmd := receiveCmd{channels: channels, folderPath: *receivePath}
 		handleReceiveCommand(cmd)
 	case CMD_SEND:
 		sendSet.Parse(os.Args[2 : len(os.Args)-1])
 		cmd := sendCmd{channels: channels}
 		cmd.filePath = os.Args[len(os.Args)-1]
+		serverAddr = *sendServerAddr
 		handleSendCommand(cmd)
 	}
 
@@ -95,10 +101,6 @@ func handleSendCommand(cmd sendCmd) {
 		log.Fatal("you need to provide at least one channel")
 	}
 
-	// fileSize, err := fileBroker.getFileSize(cmd.filePath)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
 	contentChan := make(chan []byte)
 	fInfo, err := fileBroker.loadFile(cmd.filePath, contentChan)
 	if err != nil {

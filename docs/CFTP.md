@@ -4,7 +4,7 @@ The Custom File Transfer Protocol (**CFTP**) is a TCP-based application layer pr
 
 ## Messages
 
-Messaging consists of Requests and Responses, both been used by both the client and the server. Each request should get a response indicating if the request was successful. Timeouts periods are determined by each system in its configuration.
+There are two types of messages: Requests and File Chunks. Request are used for the majority of the cases, while File Chunks are specifically used by the server for delivering files content to clients.
 
 ### Requests
 
@@ -13,9 +13,11 @@ Requests are structured as follows:
 1. **[Method](#method)** that indicates the action to perform.
 2. **Meta** section, that is a json string containing data about the request.
 3. **Channels** section, a comma-separated list of the channels involved in the request.
-4. **File** bytes.
+4. **File Information** a json string containing data about the file being transfer.
 
-The only fully required section is the **Method**, all the others may or not be specified depending on the operation to perform. For example, a client who wants to suscribe to a channel doesn't need to include the **File** section on the request.
+A request message should always end with a EOT character.
+
+The only fully required section is the **Method**, all the others may or not be specified depending on the operation to perform. For example, a client who wants to suscribe to a channel doesn't need to include the **File Information** section on the request.
 
 Every section described above should be separated by a line break (`"/n"`). Even if a section is not to be included the line break should.
  For example:
@@ -25,18 +27,25 @@ Every section described above should be separated by a line break (`"/n"`). Even
 SEND
 
 chn1,chn2
-[FILE_BYTES]
+[FILE_INFORMATION]
  ```
 
 In the above example, the **Meta** section is not included, but the empty line where it wolud be is included.
 
 >(Each section is described more explicitly in following parts of this documentation.)
 
-### Responses
+### File Chunks
 
-Every request should be responded indicating if said request was successful. The response should be a short plain text string lowercased and without spaces. Responses should always notify an expected behavior. Exceptions will be indetified by the absence of responses within the timeout period. The available responses are:
+File Chunks are messages that contain parts of the content of the file being delivered to a client. A File Chunk has a **header** and a **body**. The structure of the header is the following:
 
-* `ok`: it indicates success.
+1. The **chunk** keyword that identifies this message as a file chunk.
+2. The **Delivery ID** that is used to indentify all related chunks belonging to the same file.
+3. A **Sequence number** that indicates the right position that the current content chunk should take when storing the file being received.
+4. The **Size** of the chunk being delivered.
+
+On the other hand, the **body** is nothing more than the content chunk itself, in the format of a array of bytes.
+
+> Every part of the header described above is required and should be separated by a line break (`"/n"`). The header and the body should be separated by a EOT character.
 
 ## Requests Sections
 
@@ -46,9 +55,13 @@ The Method represents the action to perform and is the first section of the requ
 
 Client's methods:
 
-* `SEND`
-* `SUSCRIBE`
+* `send`: tells the server that the client will begin streaming a file.
+* `suscribe`: request to suscribe to a list of channels to start receiving every file sent through them.
 
 Server's methods:
 
-* `DELIVER`
+* `deliver`: tells the client that a file will begin to be delivered in the form of file chunk messages.
+
+### Meta
+
+The Meta section is defined as a json string to give the developers the ability to add as many information of the current request as they believe necessary.

@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	DEFAULT_RECEIVE_FOLDER_PATH      = "C:/Users/dejim/Documents/CFTP-Client/ReceiverFolder/"
+	DEFAULT_RECEIVE_FOLDER_PATH      = "./ReceivedFiles/"
 	MAX_FILE_SIZE                    = 1024
 	EOT                         byte = 0x04
 	CMD_SEND                         = "send"

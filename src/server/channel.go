@@ -5,17 +5,19 @@ import (
 	"log"
 	"server/cftp"
 	"server/cftp/models"
+	"sync"
 )
 
 type channel struct {
-	name             string
-	suscribedClients map[string]*client
+	name                 string
+	suscribedClients     map[string]*client
+	suscribedClientsLock sync.RWMutex
 }
 
 func (c *channel) addClient(newClient *client) {
-	// c.suscribedClients = append(c.suscribedClients, newClient)
-	//TODO: Add a lock to the suscribedClients map
+	c.suscribedClientsLock.Lock()
 	c.suscribedClients[newClient.conn.RemoteAddr().String()] = newClient
+	c.suscribedClientsLock.Unlock()
 }
 
 func (c *channel) broadcast(cmd models.Command, contentChan chan []byte) {
@@ -28,7 +30,6 @@ func (c *channel) broadcast(cmd models.Command, contentChan chan []byte) {
 		return
 	}
 	for _, client := range clients {
-		// go c.deliver(cftpBytes, client)
 		client.writeChan <- cftpBytes
 	}
 	var chunkSeq int64 = 0
@@ -37,9 +38,9 @@ func (c *channel) broadcast(cmd models.Command, contentChan chan []byte) {
 		fileContent := <-contentChan
 		chunkSeq++
 		del := models.Delivery{Content: fileContent, ID: deliveryID, Seq: chunkSeq, Size: len(fileContent)}
-		delBytes := cftp.SerializeChunkDelivery(del)
+		deliveryBytes := cftp.SerializeChunkDelivery(del)
 		for _, client := range clients {
-			client.writeChan <- delBytes
+			client.writeChan <- deliveryBytes
 		}
 	}
 
@@ -47,8 +48,16 @@ func (c *channel) broadcast(cmd models.Command, contentChan chan []byte) {
 
 func (c *channel) copySuscribedClients() map[string]*client {
 	copy := make(map[string]*client)
+	c.suscribedClientsLock.RLock()
 	for k, v := range c.suscribedClients {
 		copy[k] = v
 	}
+	c.suscribedClientsLock.RUnlock()
 	return copy
+}
+
+func (c *channel) UnsuscribeClient(client *client) {
+	c.suscribedClientsLock.Lock()
+	delete(c.suscribedClients, client.conn.RemoteAddr().String())
+	c.suscribedClientsLock.Unlock()
 }

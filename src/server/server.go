@@ -15,14 +15,13 @@ const (
 )
 
 type server struct {
-	channels       map[string]channel
+	channels       map[string]*channel
 	requestCounter int64
-	// connectedClients []client
 }
 
 // TODO: Compress the files
 func (s *server) startServer(port int) {
-	s.channels = make(map[string]channel)
+	s.channels = make(map[string]*channel)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	fmt.Printf("listening on port %d\n", port)
 	if err != nil {
@@ -33,7 +32,8 @@ func (s *server) startServer(port int) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Fatal(err)
+			log.Print(err.Error())
+			continue
 		}
 
 		go s.newClient(conn)
@@ -78,7 +78,7 @@ func (s *server) handleSuscribe(suscriber *client, cmd models.Command) {
 		if found {
 			chn.addClient(suscriber)
 		} else {
-			newChn := channel{name: cn, suscribedClients: map[string]*client{suscriber.conn.RemoteAddr().String(): suscriber}}
+			newChn := &channel{name: cn, suscribedClients: map[string]*client{suscriber.conn.RemoteAddr().String(): suscriber}}
 			s.channels[cn] = newChn
 			log.Printf("New channel: %s", cn)
 		}
@@ -125,6 +125,6 @@ func (s *server) newRequestId() int64 {
 
 func (s *server) disconnectClient(c *client) {
 	for _, channel := range s.channels {
-		delete(channel.suscribedClients, c.conn.RemoteAddr().String())
+		channel.UnsuscribeClient(c)
 	}
 }

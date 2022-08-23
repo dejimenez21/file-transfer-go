@@ -107,17 +107,6 @@ func (b *fsBroker) loadFile(path string, contentChan chan<- []byte) (finfo file,
 	return
 }
 
-func (b *fsBroker) getFileSize(filePath string) (size int64, err error) {
-	fileStat, err := os.Stat(filePath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return 0, fmt.Errorf("file %s not found", filePath)
-		}
-		return 0, fmt.Errorf("error occurred while getting file size: %v", err)
-	}
-	return fileStat.Size(), nil
-}
-
 func (b *fsBroker) createFolder() {
 	os.MkdirAll(b.path, 0700)
 }

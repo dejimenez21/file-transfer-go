@@ -14,13 +14,18 @@ const (
 	DEFAULT_BUFFER_SIZE = 1024
 )
 
-type server struct {
+type Server struct {
 	channels       map[string]*channel
 	requestCounter int64
 }
 
-func (s *server) startServer(port int) {
-	s.channels = make(map[string]*channel)
+func newServer() *Server {
+	return &Server{
+		channels: make(map[string]*channel),
+	}
+}
+
+func (s *Server) StartServer(port int) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatal(err)
@@ -36,33 +41,30 @@ func (s *server) startServer(port int) {
 			continue
 		}
 
-		go s.newClient(conn)
+		go s.handleConnection(conn)
 	}
 }
 
-func (s *server) newClient(conn net.Conn) {
+func (s *Server) handleConnection(conn net.Conn) {
 	log.Println("Client connected from", conn.RemoteAddr())
-	cmdChan := make(chan models.Command)
-	contentChan := make(chan []byte)
-	writeChan := make(chan []byte)
-	disconnectChan := make(chan *client)
-	newClient := client{conn: conn, writeChan: writeChan, disconnect: disconnectChan}
-	go func(ch <-chan models.Command, dCh <-chan *client) {
+
+	client := newClient(conn)
+	go func(client *Client) {
 		for {
 			select {
-			case cmd := <-ch:
-				s.handleCommand(&newClient, cmd, contentChan)
-			case cl := <-dCh:
+			case cmd := <-client.CmdChan:
+				s.handleCommand(client, cmd, client.ContentChan)
+			case cl := <-client.Disconnect:
 				s.disconnectClient(cl)
 			}
 
 		}
-	}(cmdChan, disconnectChan)
-	go newClient.startWriter()
-	newClient.readRequest(cmdChan, contentChan)
+	}(client)
+	go client.startWriter()
+	client.readRequest()
 }
 
-func (s *server) handleCommand(client *client, cmd models.Command, contentChan <-chan []byte) {
+func (s *Server) handleCommand(client *Client, cmd models.Command, contentChan <-chan []byte) {
 
 	switch cmd.Method {
 	case CMD_SUSCRIBE:
@@ -72,24 +74,23 @@ func (s *server) handleCommand(client *client, cmd models.Command, contentChan <
 	}
 }
 
-func (s *server) handleSuscribe(suscriber *client, cmd models.Command) {
+func (s *Server) handleSuscribe(suscriber *Client, cmd models.Command) {
 	for _, cn := range cmd.Channels {
 		chn, found := s.channels[cn]
 		if found {
 			chn.addClient(suscriber)
 		} else {
-			newChn := &channel{name: cn, suscribedClients: map[string]*client{suscriber.conn.RemoteAddr().String(): suscriber}}
+			newChn := &channel{name: cn, suscribedClients: map[string]*Client{suscriber.Conn.RemoteAddr().String(): suscriber}}
 			s.channels[cn] = newChn
 			log.Printf("New channel: %s", cn)
 		}
-		log.Printf("Client %s just suscribed to channel %s", (*suscriber).conn.RemoteAddr().String(), cn)
+		log.Printf("Client %s just suscribed to channel %s", (*suscriber).Conn.RemoteAddr().String(), cn)
 	}
 }
 
-func (s *server) handleSend(sender *client, cmd models.Command, contentChan <-chan []byte) {
-	senderAddress := sender.conn.RemoteAddr().String()
+func (s *Server) handleSend(sender *Client, cmd models.Command, contentChan <-chan []byte) {
+	senderAddress := sender.Conn.RemoteAddr().String()
 	cmd.Meta.SenderAddress = senderAddress
-	// contentChans := make([]chan []byte, len(cmd.Channels))
 	var contentChans []chan []byte
 
 	for _, destChannel := range cmd.Channels {
@@ -100,7 +101,7 @@ func (s *server) handleSend(sender *client, cmd models.Command, contentChan <-ch
 		}
 		deliverCmd := models.Command{
 			Method:   CMD_DELIVER,
-			Meta:     models.MetaData{SenderAddress: sender.conn.RemoteAddr().String(), RequestId: int(s.newRequestId())},
+			Meta:     models.MetaData{SenderAddress: sender.Conn.RemoteAddr().String(), RequestId: int(s.newRequestId())},
 			Channels: []string{destChannel},
 			FileInfo: cmd.FileInfo,
 		}
@@ -118,12 +119,12 @@ func (s *server) handleSend(sender *client, cmd models.Command, contentChan <-ch
 
 }
 
-func (s *server) newRequestId() int64 {
+func (s *Server) newRequestId() int64 {
 	s.requestCounter++
 	return s.requestCounter
 }
 
-func (s *server) disconnectClient(c *client) {
+func (s *Server) disconnectClient(c *Client) {
 	for key, channel := range s.channels {
 		channel.UnsuscribeClient(c)
 		if len(channel.suscribedClients) < 1 {

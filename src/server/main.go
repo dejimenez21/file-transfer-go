@@ -6,6 +6,6 @@ func main() {
 	port := flag.Int("port", 8888, "The port where the server will listen.")
 	flag.Parse()
 
-	s := server{}
-	s.startServer(*port)
+	s := newServer()
+	s.StartServer(*port)
 }

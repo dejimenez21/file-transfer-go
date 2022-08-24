@@ -14,13 +14,13 @@ type channel struct {
 	suscribedClientsLock sync.RWMutex
 }
 
-func (c *channel) addClient(newClient *Client) {
+func (c *channel) AddClient(newClient *Client) {
 	c.suscribedClientsLock.Lock()
 	c.suscribedClients[newClient.Conn.RemoteAddr().String()] = newClient
 	c.suscribedClientsLock.Unlock()
 }
 
-func (c *channel) broadcast(cmd models.Command, contentChan chan []byte) {
+func (c *channel) Broadcast(cmd models.Command, contentChan chan []byte) {
 	log.Printf("Broadcasting file from %s through %s", cmd.Meta.SenderAddress, c.name)
 	clients := c.copySuscribedClients()
 	cftpBytes, err := cftp.SerializeCommand(cmd)
@@ -46,6 +46,12 @@ func (c *channel) broadcast(cmd models.Command, contentChan chan []byte) {
 
 }
 
+func (c *channel) RemoveClient(client *Client) {
+	c.suscribedClientsLock.Lock()
+	delete(c.suscribedClients, client.Conn.RemoteAddr().String())
+	c.suscribedClientsLock.Unlock()
+}
+
 func (c *channel) copySuscribedClients() map[string]*Client {
 	copy := make(map[string]*Client)
 	c.suscribedClientsLock.RLock()
@@ -54,10 +60,4 @@ func (c *channel) copySuscribedClients() map[string]*Client {
 	}
 	c.suscribedClientsLock.RUnlock()
 	return copy
-}
-
-func (c *channel) UnsuscribeClient(client *Client) {
-	c.suscribedClientsLock.Lock()
-	delete(c.suscribedClients, client.Conn.RemoteAddr().String())
-	c.suscribedClientsLock.Unlock()
 }

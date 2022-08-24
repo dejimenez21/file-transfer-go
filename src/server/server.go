@@ -78,7 +78,7 @@ func (s *Server) handleSuscribe(suscriber *Client, cmd models.Command) {
 	for _, cn := range cmd.Channels {
 		chn, found := s.channels[cn]
 		if found {
-			chn.addClient(suscriber)
+			chn.AddClient(suscriber)
 		} else {
 			newChn := &channel{name: cn, suscribedClients: map[string]*Client{suscriber.Conn.RemoteAddr().String(): suscriber}}
 			s.channels[cn] = newChn
@@ -106,7 +106,7 @@ func (s *Server) handleSend(sender *Client, cmd models.Command, contentChan <-ch
 			FileInfo: cmd.FileInfo,
 		}
 		channelContentChan := make(chan []byte)
-		go chn.broadcast(deliverCmd, channelContentChan)
+		go chn.Broadcast(deliverCmd, channelContentChan)
 		contentChans = append(contentChans, channelContentChan)
 	}
 	for i := 0; i < int(cmd.FileInfo.Size); {
@@ -126,7 +126,7 @@ func (s *Server) newRequestId() int64 {
 
 func (s *Server) disconnectClient(c *Client) {
 	for key, channel := range s.channels {
-		channel.UnsuscribeClient(c)
+		channel.RemoveClient(c)
 		if len(channel.suscribedClients) < 1 {
 			delete(s.channels, key)
 		}

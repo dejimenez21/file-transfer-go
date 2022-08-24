@@ -66,9 +66,8 @@ func (c *Client) startWriter() {
 			log.Println(err)
 			break
 		}
-		//TODO: Tell the server that the connection is closed.
 	}
-
+	c.Disconnect <- c
 }
 
 func (c *Client) readFileContent(bufSize int, reader *bufio.Reader) (data []byte, err error) {

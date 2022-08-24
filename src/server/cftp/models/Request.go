@@ -1,6 +1,6 @@
 package models
 
-type Command struct {
+type Request struct {
 	Method   string
 	Meta     MetaData
 	Channels []string
@@ -9,5 +9,5 @@ type Command struct {
 
 type MetaData struct {
 	SenderAddress string
-	RequestId     int
+	RequestId     int64
 }

@@ -57,7 +57,7 @@ func (req *request) processDeliver() (err error) {
 
 			n, err := f.Write(chunk.Content)
 			if err != nil {
-				log.Printf("error writing content to %s file", f.Name())
+				log.Printf("error writing content to %s file: %v", f.Name(), err)
 				fileBroker.removeContentChannel(req.Meta.RequestId)
 				//TODO: Delete file
 				return

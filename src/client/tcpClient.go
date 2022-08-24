@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio"
-	"io"
+	"fmt"
 	"log"
 	"net"
 	"strings"
@@ -25,43 +25,36 @@ func (c *tcpClient) establishConnection() {
 	c.conn = conn
 }
 
-func (c *tcpClient) sendRequest(req request) {
+func (c *tcpClient) sendRequest(req request) error {
 	c.establishConnection()
 	serReq, err := serializeRequest(req)
 	if err != nil {
-		log.Fatalf("Couldn't serialize request: %v", err)
+		return fmt.Errorf("couldn't serialize request: %v", err)
 	}
 	serReq = append(serReq, EOT)
 	_, err = c.conn.Write(serReq)
 	if err != nil {
-		log.Fatalf("Couldn't send request: %v", err)
+		return fmt.Errorf("couldn't send request: %v", err)
 	}
+	return nil
 }
 
-func (c *tcpClient) sendFileContent(content []byte) {
+func (c *tcpClient) sendFileContent(content []byte) error {
 	_, err := c.conn.Write(content)
 	if err != nil {
-		log.Fatalf("Couldn't send request: %v", err)
+		return fmt.Errorf("couldn't send request: %v", err)
 	}
+	return nil
 }
 
 func (c *tcpClient) readInput() (msg cftpMessage, err error) {
 	if c.reader == nil {
 		c.reader = bufio.NewReader(c.conn)
 	}
-	// typeIndicator, err := reader.ReadString('\n')
-	// if typeIndicator == "chunk\n" {
 
-	// 	del := deserializeDelivery()
-	// }
 	data, err := c.reader.ReadBytes(EOT)
 	if err != nil {
-		if err != io.EOF {
-			log.Printf("Error reading message from: %v", c.conn.RemoteAddr())
-		}
-		//TODO: check the right way of checking if connection is closed
 		log.Fatalf("the connection with server was lost: %v", err)
-		return
 	}
 	stringMsg := string(data)
 
@@ -76,18 +69,17 @@ func (c *tcpClient) readInput() (msg cftpMessage, err error) {
 
 	req, err := deserializeRequest(strings.TrimSuffix(stringMsg, string(EOT)))
 	if err != nil {
-		log.Printf("Error deserializing message: %v", err)
+		return msg, fmt.Errorf("error deserializing message: %v", err)
 	}
 	msg = &req
 	return
-	// chn <- &req
 }
 
 func (c *tcpClient) readChunk(del delivery) (result delivery, err error) {
 	data := make([]byte, del.Size)
 	n, err := c.reader.Read(data)
 	if err != nil {
-		log.Fatal("lost connection with the server")
+		return result, fmt.Errorf("the connection with server was lost: %v", err)
 	}
 	data = data[:n]
 	missing := del.Size - n
@@ -95,8 +87,7 @@ func (c *tcpClient) readChunk(del delivery) (result delivery, err error) {
 		missingData := make([]byte, missing-i)
 		nm, err := c.conn.Read(missingData)
 		if err != nil {
-			//TODO: check the right way of checking if connection is closed
-			log.Fatal("lost connection with the server")
+			return result, fmt.Errorf("the connection with server was lost: %v", err)
 		}
 		i += nm
 		missingData = missingData[:nm]

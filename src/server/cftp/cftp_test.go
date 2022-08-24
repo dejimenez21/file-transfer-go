@@ -9,7 +9,7 @@ import (
 func TestDeserializeValidCommandWithFileContent(t *testing.T) {
 	//given
 	inputString := "SEND\n{ \"hasFileContent\": true }\nchn1,chn2\n{ \"name\": \"testDoc\", \"ext\": \"docx\", \"size\": 12017, \"content\": [84, 101, 115, 116, 10, 32, 99, 111, 110, 116, 101, 110, 116, 33, 33, 33] }"
-	expectedCommand := models.Command{
+	expectedCommand := models.Request{
 		Method:   "SEND",
 		Meta:     models.MetaData{},
 		Channels: []string{"chn1", "chn2"},
@@ -27,7 +27,7 @@ func TestDeserializeValidCommandWithFileContent(t *testing.T) {
 
 func TestSerializeValidDeliveryWithFileContent(t *testing.T) {
 	//given
-	inputCommand := models.Command{
+	inputCommand := models.Request{
 		Method:   "DELIVER",
 		Meta:     models.MetaData{SenderAddress: "localhost:4567"},
 		Channels: []string{"chn1"},

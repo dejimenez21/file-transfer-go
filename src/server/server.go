@@ -60,11 +60,11 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 		}
 	}(client)
-	go client.startWriter()
-	client.readRequest()
+	go client.StartWriter()
+	client.ReadRequest()
 }
 
-func (s *Server) handleCommand(client *Client, cmd models.Command, contentChan <-chan []byte) {
+func (s *Server) handleCommand(client *Client, cmd models.Request, contentChan <-chan []byte) {
 
 	switch cmd.Method {
 	case CMD_SUSCRIBE:
@@ -74,7 +74,7 @@ func (s *Server) handleCommand(client *Client, cmd models.Command, contentChan <
 	}
 }
 
-func (s *Server) handleSuscribe(suscriber *Client, cmd models.Command) {
+func (s *Server) handleSuscribe(suscriber *Client, cmd models.Request) {
 	for _, cn := range cmd.Channels {
 		chn, found := s.channels[cn]
 		if found {
@@ -88,7 +88,7 @@ func (s *Server) handleSuscribe(suscriber *Client, cmd models.Command) {
 	}
 }
 
-func (s *Server) handleSend(sender *Client, cmd models.Command, contentChan <-chan []byte) {
+func (s *Server) handleSend(sender *Client, cmd models.Request, contentChan <-chan []byte) {
 	senderAddress := sender.Conn.RemoteAddr().String()
 	cmd.Meta.SenderAddress = senderAddress
 	var contentChans []chan []byte
@@ -96,10 +96,10 @@ func (s *Server) handleSend(sender *Client, cmd models.Command, contentChan <-ch
 	for _, destChannel := range cmd.Channels {
 		chn, found := s.channels[destChannel]
 		if !found {
-			//TODO: Add functionality to inform the client that channel doesn't exist'
+			//TODO: Inform the client that channel doesn't exist'
 			continue
 		}
-		deliverCmd := models.Command{
+		deliverCmd := models.Request{
 			Method:   CMD_DELIVER,
 			Meta:     models.MetaData{SenderAddress: sender.Conn.RemoteAddr().String(), RequestId: int(s.newRequestId())},
 			Channels: []string{destChannel},

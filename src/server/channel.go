@@ -20,7 +20,7 @@ func (c *channel) AddClient(newClient *Client) {
 	c.suscribedClientsLock.Unlock()
 }
 
-func (c *channel) Broadcast(cmd models.Command, contentChan chan []byte) {
+func (c *channel) Broadcast(cmd models.Request, contentChan chan []byte) {
 	log.Printf("Broadcasting file from %s through %s", cmd.Meta.SenderAddress, c.name)
 	clients := c.copySuscribedClients()
 	cftpBytes, err := cftp.SerializeCommand(cmd)

@@ -11,7 +11,7 @@ import (
 
 type Client struct {
 	Conn        net.Conn
-	CmdChan     chan models.Command
+	CmdChan     chan models.Request
 	ContentChan chan []byte
 	WriteChan   chan []byte
 	Disconnect  chan *Client
@@ -20,14 +20,14 @@ type Client struct {
 func newClient(conn net.Conn) *Client {
 	return &Client{
 		Conn:        conn,
-		CmdChan:     make(chan models.Command),
+		CmdChan:     make(chan models.Request),
 		ContentChan: make(chan []byte),
 		WriteChan:   make(chan []byte),
 		Disconnect:  make(chan *Client),
 	}
 }
 
-func (c *Client) readRequest() {
+func (c *Client) ReadRequest() {
 	for {
 		reader := bufio.NewReader(c.Conn)
 		data, err := reader.ReadBytes(cftp.END_OF_MSG)
@@ -58,7 +58,7 @@ func (c *Client) readRequest() {
 	}
 }
 
-func (c *Client) startWriter() {
+func (c *Client) StartWriter() {
 	for {
 		msg := <-c.WriteChan
 		_, err := c.Conn.Write(msg)

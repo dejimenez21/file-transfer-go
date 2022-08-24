@@ -101,7 +101,7 @@ func (s *Server) handleSend(sender *Client, cmd models.Request, contentChan <-ch
 		}
 		deliverCmd := models.Request{
 			Method:   CMD_DELIVER,
-			Meta:     models.MetaData{SenderAddress: sender.Conn.RemoteAddr().String(), RequestId: int(s.newRequestId())},
+			Meta:     models.MetaData{SenderAddress: sender.Conn.RemoteAddr().String(), RequestId: s.newRequestId()},
 			Channels: []string{destChannel},
 			FileInfo: cmd.FileInfo,
 		}

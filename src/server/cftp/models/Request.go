@@ -9,5 +9,5 @@ type Request struct {
 
 type MetaData struct {
 	SenderAddress string
-	RequestId     int
+	RequestId     int64
 }

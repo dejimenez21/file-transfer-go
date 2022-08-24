@@ -33,7 +33,7 @@ func (c *channel) Broadcast(cmd models.Request, contentChan chan []byte) {
 		client.WriteChan <- cftpBytes
 	}
 	var chunkSeq int64 = 0
-	deliveryID := models.NewDeliveryId()
+	deliveryID := cmd.Meta.RequestId
 	for {
 		fileContent := <-contentChan
 		chunkSeq++

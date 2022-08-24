@@ -1,10 +1,12 @@
 package main
 
 import (
-	"flag"
+	"fmt"
 	"log"
 	"os"
 	"time"
+
+	"github.com/urfave/cli/v2"
 )
 
 const (
@@ -32,39 +34,52 @@ func main() {
 	client := fact.getTcpClient()
 	defer closeConnection(client)
 
-	var channels arrayFlags
-
-	receiveSet := flag.NewFlagSet("receive", flag.ExitOnError)
-	receivePath := receiveSet.String("path", DEFAULT_RECEIVE_FOLDER_PATH, "Folder where the received files will be stored.")
-	receiveSet.Var(&channels, "ch", "Channel to receive files from.")
-	receiveServerAddr := receiveSet.String("server", DEFAULT_SERVER_ADDR, "Address for the CFTP server.")
-
-	sendSet := flag.NewFlagSet("send", flag.ExitOnError)
-	sendSet.Var(&channels, "ch", "Channel to send files to.")
-	sendServerAddr := sendSet.String("server", DEFAULT_SERVER_ADDR, "Address for the CFTP server.")
-
-	if len(os.Args) < 2 {
-		log.Fatal("you need to provide a command")
+	app := &cli.App{
+		Name:  "client",
+		Usage: "A CFTP client application",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "server", Usage: "Server address", Aliases: []string{"s"}, Value: DEFAULT_SERVER_ADDR},
+		},
+		Commands: []*cli.Command{
+			{
+				Name:  "send",
+				Usage: "Send a file through several channels",
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{Name: "channels", Aliases: []string{"ch"}, Usage: "Channels through which the file will be sent", Required: true},
+				},
+				Action: func(ctx *cli.Context) error {
+					cmd := sendCmd{channels: ctx.StringSlice("channels")}
+					cmd.filePath = ctx.Args().First()
+					if cmd.filePath == "" {
+						return fmt.Errorf("you need to specify the file to send")
+					}
+					serverAddr = ctx.String("server")
+					handleSendCommand(cmd)
+					return nil
+				},
+			},
+			{
+				Name:  "receive",
+				Usage: "Start receiving files",
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{Name: "channels", Aliases: []string{"ch"}, Usage: "Channels to suscribe", Required: true},
+					&cli.PathFlag{Name: "outputDir", Aliases: []string{"o"}, Usage: "Save the received files to `DIRECTORY/`", Value: DEFAULT_RECEIVE_FOLDER_PATH},
+				},
+				Action: func(ctx *cli.Context) error {
+					receivePath := ctx.Path("outputDir")
+					fact.fileBroker.path = receivePath
+					serverAddr = ctx.String("server")
+					cmd := receiveCmd{channels: ctx.StringSlice("channels"), folderPath: receivePath}
+					handleReceiveCommand(cmd)
+					return nil
+				},
+			},
+		},
 	}
-	method := os.Args[1]
 
-	switch method {
-	case CMD_RECEIVE:
-		receiveSet.Parse(os.Args[2:len(os.Args)])
-		fact.fileBroker.path = *receivePath
-		serverAddr = *receiveServerAddr
-		cmd := receiveCmd{channels: channels, folderPath: *receivePath}
-		handleReceiveCommand(cmd)
-	case CMD_SEND:
-		sendSet.Parse(os.Args[2 : len(os.Args)-1])
-		cmd := sendCmd{channels: channels}
-		cmd.filePath = os.Args[len(os.Args)-1]
-		serverAddr = *sendServerAddr
-		handleSendCommand(cmd)
-	default:
-		log.Fatalf("unknown command")
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
 	}
-
 }
 
 func closeConnection(client *tcpClient) {

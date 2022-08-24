@@ -43,6 +43,9 @@ func main() {
 	sendSet.Var(&channels, "ch", "Channel to send files to.")
 	sendServerAddr := sendSet.String("server", DEFAULT_SERVER_ADDR, "Address for the CFTP server.")
 
+	if len(os.Args) < 2 {
+		log.Fatal("you need to provide a command")
+	}
 	method := os.Args[1]
 
 	switch method {
@@ -58,6 +61,8 @@ func main() {
 		cmd.filePath = os.Args[len(os.Args)-1]
 		serverAddr = *sendServerAddr
 		handleSendCommand(cmd)
+	default:
+		log.Fatalf("unknown command")
 	}
 
 }

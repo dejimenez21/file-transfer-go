@@ -19,15 +19,15 @@ type server struct {
 	requestCounter int64
 }
 
-// TODO: Compress the files
 func (s *server) startServer(port int) {
 	s.channels = make(map[string]*channel)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	fmt.Printf("listening on port %d\n", port)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer listener.Close()
+
+	fmt.Printf("listening on port %d\n", port)
 
 	for {
 		conn, err := listener.Accept()
@@ -124,7 +124,10 @@ func (s *server) newRequestId() int64 {
 }
 
 func (s *server) disconnectClient(c *client) {
-	for _, channel := range s.channels {
+	for key, channel := range s.channels {
 		channel.UnsuscribeClient(c)
+		if len(channel.suscribedClients) < 1 {
+			delete(s.channels, key)
+		}
 	}
 }

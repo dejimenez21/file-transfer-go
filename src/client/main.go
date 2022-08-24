@@ -22,8 +22,7 @@ const (
 )
 
 var (
-	fact = new(factory)
-	// client    = new(tcpClient)
+	fact       = new(factory)
 	startTime  = time.Now().UnixNano()
 	serverAddr string
 )
@@ -31,11 +30,11 @@ var (
 func main() {
 	fact.fileBroker = &fsBroker{}
 	client := fact.getTcpClient()
+	defer closeConnection(client)
 
 	var channels arrayFlags
 
 	receiveSet := flag.NewFlagSet("receive", flag.ExitOnError)
-	//receiveDetached := receiveCmd.Bool("async", false, "Indicates if the receive operation should run asynchronously.")
 	receivePath := receiveSet.String("path", DEFAULT_RECEIVE_FOLDER_PATH, "Folder where the received files will be stored.")
 	receiveSet.Var(&channels, "ch", "Channel to receive files from.")
 	receiveServerAddr := receiveSet.String("server", DEFAULT_SERVER_ADDR, "Address for the CFTP server.")
@@ -61,6 +60,9 @@ func main() {
 		handleSendCommand(cmd)
 	}
 
+}
+
+func closeConnection(client *tcpClient) {
 	if client.conn != nil {
 		client.conn.Close()
 	}
@@ -69,14 +71,19 @@ func main() {
 func handleReceiveCommand(cmd receiveCmd) {
 	client := fact.getTcpClient()
 	if len(cmd.channels) < 1 {
-		log.Fatal("you need to provide at least one channel")
+		log.Print("you need to provide at least one channel")
+		return
 	}
 	req := request{
 		Method:   REQ_SUSCRIBE,
 		Channels: cmd.channels,
 	}
 
-	client.sendRequest(req)
+	err := client.sendRequest(req)
+	if err != nil {
+		log.Printf("error sending request: %v\n", err)
+		return
+	}
 	for {
 		input, err := client.readInput()
 		if err != nil {
@@ -95,24 +102,35 @@ func handleSendCommand(cmd sendCmd) {
 	fileBroker := fact.getFileBroker()
 
 	if cmd.filePath == "" {
-		log.Fatal("you need to specify the file to send")
+		log.Print("you need to specify the file to send")
+		return
 	}
 	if len(cmd.channels) < 1 {
-		log.Fatal("you need to provide at least one channel")
+		log.Print("you need to provide at least one channel")
+		return
 	}
 
 	contentChan := make(chan []byte)
 	fInfo, err := fileBroker.loadFile(cmd.filePath, contentChan)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return
 	}
 	req := request{
 		Method:   REQ_SEND,
 		Channels: cmd.channels,
 		FileInfo: fInfo,
 	}
-	client.sendRequest(req)
+	err = client.sendRequest(req)
+	if err != nil {
+		log.Printf("error sending send request: %v\n", err)
+		return
+	}
 	for content := range contentChan {
-		client.sendFileContent(content)
+		err = client.sendFileContent(content)
+		if err != nil {
+			log.Printf("error sending file content: %v\n", err)
+			return
+		}
 	}
 }

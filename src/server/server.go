@@ -6,6 +6,7 @@ import (
 	"net"
 	"server/cftp"
 	"server/cftp/models"
+	"sync"
 )
 
 const (
@@ -14,6 +15,7 @@ const (
 
 type Server struct {
 	channels       map[string]*channel
+	channelsLock   sync.RWMutex
 	requestCounter int64
 }
 
@@ -72,6 +74,7 @@ func (s *Server) handleCommand(client *Client, cmd models.Request, contentChan <
 }
 
 func (s *Server) handleSuscribe(suscriber *Client, cmd models.Request) {
+	s.channelsLock.Lock()
 	for _, cn := range cmd.Channels {
 		chn, found := s.channels[cn]
 		if found {
@@ -83,6 +86,7 @@ func (s *Server) handleSuscribe(suscriber *Client, cmd models.Request) {
 		}
 		log.Printf("Client %s just suscribed to channel %s", (*suscriber).Conn.RemoteAddr().String(), cn)
 	}
+	s.channelsLock.Unlock()
 }
 
 func (s *Server) handleSend(sender *Client, cmd models.Request, contentChan <-chan []byte) {
@@ -91,7 +95,9 @@ func (s *Server) handleSend(sender *Client, cmd models.Request, contentChan <-ch
 	var contentChans []chan []byte
 
 	for _, destChannel := range cmd.Channels {
+		s.channelsLock.RLock()
 		chn, found := s.channels[destChannel]
+		s.channelsLock.RUnlock()
 		if !found {
 			continue
 		}
@@ -127,12 +133,15 @@ func (s *Server) newRequestId() int64 {
 }
 
 func (s *Server) disconnectClient(c *Client) {
+	s.channelsLock.Lock()
 	for key, channel := range s.channels {
 		channel.RemoveClient(c)
 		if len(channel.suscribedClients) < 1 {
 			delete(s.channels, key)
 		}
 	}
+	s.channelsLock.Unlock()
+
 }
 
 func sendAbortRequest(client *Client, msg string) {

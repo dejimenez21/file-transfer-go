@@ -10,4 +10,12 @@ type Request struct {
 type MetaData struct {
 	SenderAddress string
 	RequestId     int64
+	Message       string
+}
+
+func NewAbortRequest(msg string) *Request {
+	return &Request{
+		Method: REQ_ABORT,
+		Meta:   MetaData{Message: msg},
+	}
 }

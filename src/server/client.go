@@ -29,20 +29,20 @@ func newClient(conn net.Conn) *Client {
 func (c *Client) ReadRequest() {
 	for {
 		reader := bufio.NewReader(c.Conn)
-		data, err := reader.ReadBytes(cftp.END_OF_MSG)
+		data, err := reader.ReadBytes(models.END_OF_MSG)
 		if err != nil {
 			log.Printf("Client %v disconected", c.Conn.RemoteAddr())
 			c.Disconnect <- c
 			return
 		}
 		stringCmd := string(data)
-		cmd, err := cftp.DeserializeCommand(strings.TrimSuffix(stringCmd, string(cftp.END_OF_MSG)))
+		cmd, err := cftp.DeserializeRequest(strings.TrimSuffix(stringCmd, string(models.END_OF_MSG)))
 		if err != nil {
 			log.Printf("Error deserializing message: %v", err)
 		}
 		c.CmdChan <- cmd
 
-		if cmd.Method == CMD_SEND {
+		if cmd.Method == models.REQ_SEND {
 			for i := 0; i < int(cmd.FileInfo.Size); {
 				contentData, err := c.readFileContent(DEFAULT_BUFFER_SIZE, reader)
 				if err != nil {

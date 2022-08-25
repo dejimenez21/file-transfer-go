@@ -18,6 +18,7 @@ const (
 	REQ_SUSCRIBE                     = "suscribe"
 	REQ_DELIVER                      = "deliver"
 	REQ_SEND                         = "send"
+	REQ_ABORT                        = "abort"
 	MSG_TYPE_REQ                     = "request"
 	MSG_TYPE_CHUNK                   = "chunk"
 	DEFAULT_SERVER_ADDR              = "localhost:8888"
@@ -30,6 +31,7 @@ var (
 )
 
 func main() {
+	log.SetFlags(0)
 	fact.fileBroker = &fsBroker{}
 	client := fact.getTcpClient()
 	defer closeConnection(client)
@@ -90,10 +92,7 @@ func closeConnection(client *tcpClient) {
 
 func handleReceiveCommand(cmd receiveCmd) {
 	client := fact.getTcpClient()
-	if len(cmd.channels) < 1 {
-		log.Print("you need to provide at least one channel")
-		return
-	}
+
 	req := request{
 		Method:   REQ_SUSCRIBE,
 		Channels: cmd.channels,
@@ -120,18 +119,10 @@ func handleReceiveCommand(cmd receiveCmd) {
 func handleSendCommand(cmd sendCmd) {
 	client := fact.getTcpClient()
 	fileBroker := fact.getFileBroker()
-
-	if cmd.filePath == "" {
-		log.Print("you need to specify the file to send")
-		return
-	}
-	if len(cmd.channels) < 1 {
-		log.Print("you need to provide at least one channel")
-		return
-	}
-
 	contentChan := make(chan []byte)
-	fInfo, err := fileBroker.loadFile(cmd.filePath, contentChan)
+	abortChan := make(chan string)
+
+	fInfo, err := fileBroker.loadFile(cmd.filePath, contentChan, abortChan)
 	if err != nil {
 		log.Print(err)
 		return
@@ -146,11 +137,36 @@ func handleSendCommand(cmd sendCmd) {
 		log.Printf("error sending send request: %v\n", err)
 		return
 	}
+	log.Printf("sending file %s ...", req.FileInfo.Name)
+	go listenForAbortRequest(client, abortChan)
+
 	for content := range contentChan {
 		err = client.sendFileContent(content)
 		if err != nil {
 			log.Printf("error sending file content: %v\n", err)
 			return
 		}
+	}
+}
+
+func listenForAbortRequest(client *tcpClient, abortChan chan<- string) {
+	for {
+		input, err := client.readInput()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		if input.getMessageType() != MSG_TYPE_REQ {
+			log.Println("unexpected message type received: ", input.getMessageType())
+			continue
+		}
+
+		req := input.(*request)
+		if req.Method != REQ_ABORT {
+			log.Println("unexpected request received: ", req.Method)
+			continue
+		}
+		abortChan <- req.Meta.Message
+		break
 	}
 }

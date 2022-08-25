@@ -69,7 +69,7 @@ func (b *fsBroker) getSavingFileFullName(f file) (filePath string) {
 	return
 }
 
-func (b *fsBroker) loadFile(path string, contentChan chan<- []byte) (finfo file, err error) {
+func (b *fsBroker) loadFile(path string, contentChan chan<- []byte, abortChan <-chan string) (finfo file, err error) {
 	fmt.Println("Getting file", path, "...")
 	f, err := os.Open(path)
 	if err != nil {
@@ -86,8 +86,15 @@ func (b *fsBroker) loadFile(path string, contentChan chan<- []byte) (finfo file,
 	finfo.Ext = filepath.Ext(fStat.Name())
 	finfo.Size = fStat.Size()
 
-	go func(file *os.File, contentChan chan<- []byte) {
+	go func(file *os.File, contentChan chan<- []byte, abortChan <-chan string) {
 		for {
+			select {
+			case msg := <-abortChan:
+				log.Printf("operation aborted: %s", msg)
+				close(contentChan)
+				return
+			default:
+			}
 			data := make([]byte, MAX_FILE_SIZE)
 			n, err := file.Read(data)
 			if err != nil && err != io.EOF {
@@ -102,7 +109,7 @@ func (b *fsBroker) loadFile(path string, contentChan chan<- []byte) (finfo file,
 			data = data[:n]
 			contentChan <- data
 		}
-	}(f, contentChan)
+	}(f, contentChan, abortChan)
 
 	return
 }

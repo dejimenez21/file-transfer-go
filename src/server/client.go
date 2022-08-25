@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"net"
 	"server/cftp"
@@ -11,39 +12,39 @@ import (
 
 type Client struct {
 	Conn        net.Conn
-	CmdChan     chan models.Request
+	RequestChan chan models.Request
 	ContentChan chan []byte
-	WriteChan   chan []byte
 	Disconnect  chan *Client
+	AbortChan   chan bool
 }
 
 func newClient(conn net.Conn) *Client {
 	return &Client{
 		Conn:        conn,
-		CmdChan:     make(chan models.Request),
+		RequestChan: make(chan models.Request),
 		ContentChan: make(chan []byte),
-		WriteChan:   make(chan []byte),
 		Disconnect:  make(chan *Client),
+		AbortChan:   make(chan bool),
 	}
 }
 
 func (c *Client) ReadRequest() {
 	for {
 		reader := bufio.NewReader(c.Conn)
-		data, err := reader.ReadBytes(cftp.END_OF_MSG)
+		data, err := reader.ReadBytes(models.END_OF_MSG)
 		if err != nil {
 			log.Printf("Client %v disconected", c.Conn.RemoteAddr())
 			c.Disconnect <- c
 			return
 		}
 		stringCmd := string(data)
-		cmd, err := cftp.DeserializeCommand(strings.TrimSuffix(stringCmd, string(cftp.END_OF_MSG)))
+		cmd, err := cftp.DeserializeRequest(strings.TrimSuffix(stringCmd, string(models.END_OF_MSG)))
 		if err != nil {
 			log.Printf("Error deserializing message: %v", err)
 		}
-		c.CmdChan <- cmd
+		c.RequestChan <- cmd
 
-		if cmd.Method == CMD_SEND {
+		if cmd.Method == models.REQ_SEND {
 			for i := 0; i < int(cmd.FileInfo.Size); {
 				contentData, err := c.readFileContent(DEFAULT_BUFFER_SIZE, reader)
 				if err != nil {
@@ -52,23 +53,32 @@ func (c *Client) ReadRequest() {
 					return
 				}
 				i += len(contentData)
-				c.ContentChan <- contentData
+				select {
+				case <-c.AbortChan:
+					for {
+						_, err := c.Conn.Read(data)
+						if err != nil {
+							log.Printf("Client %v disconected", c.Conn.RemoteAddr())
+							c.Disconnect <- c
+							return
+						}
+					}
+				default:
+					c.ContentChan <- contentData
+
+				}
 			}
 		}
 	}
 }
 
-func (c *Client) StartWriter() {
-	for {
-		msg := <-c.WriteChan
-		_, err := c.Conn.Write(msg)
-		if err != nil {
-			log.Println(err)
-			break
-		}
+func (c *Client) Write(bytes []byte) error {
+	_, err := c.Conn.Write(bytes)
+	if err != nil {
+		c.Disconnect <- c
+		return fmt.Errorf("Client %v disconected: %v", c.Conn.RemoteAddr(), err)
 	}
-	c.Disconnect <- c
-	//TODO: when sending a file notify de channel to stop writing to this chan.
+	return nil
 }
 
 func (c *Client) readFileContent(bufSize int, reader *bufio.Reader) (data []byte, err error) {

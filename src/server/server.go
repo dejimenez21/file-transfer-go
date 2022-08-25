@@ -4,24 +4,24 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"server/cftp"
 	"server/cftp/models"
+	"sync"
 )
 
 const (
-	CMD_SEND            = "send"
-	CMD_DELIVER         = "deliver"
-	CMD_SUSCRIBE        = "suscribe"
 	DEFAULT_BUFFER_SIZE = 1024
 )
 
 type Server struct {
-	channels       map[string]*channel
+	Channels       map[string]*Channel
+	channelsLock   sync.RWMutex
 	requestCounter int64
 }
 
 func newServer() *Server {
 	return &Server{
-		channels: make(map[string]*channel),
+		Channels: make(map[string]*Channel),
 	}
 }
 
@@ -52,65 +52,66 @@ func (s *Server) handleConnection(conn net.Conn) {
 	go func(client *Client) {
 		for {
 			select {
-			case cmd := <-client.CmdChan:
-				s.handleCommand(client, cmd, client.ContentChan)
+			case req := <-client.RequestChan:
+				s.handleRequest(client, req)
 			case cl := <-client.Disconnect:
 				s.disconnectClient(cl)
+				return
 			}
 
 		}
 	}(client)
-	go client.StartWriter()
 	client.ReadRequest()
 }
 
-func (s *Server) handleCommand(client *Client, cmd models.Request, contentChan <-chan []byte) {
+func (s *Server) handleRequest(client *Client, req models.Request) {
 
-	switch cmd.Method {
-	case CMD_SUSCRIBE:
-		s.handleSuscribe(client, cmd)
-	case CMD_SEND:
-		s.handleSend(client, cmd, contentChan)
+	switch req.Method {
+	case models.REQ_SUSCRIBE:
+		s.handleSuscriptionRequest(client, req)
+	case models.REQ_SEND:
+		s.handleFileSendingRequest(client, req)
 	}
 }
 
-func (s *Server) handleSuscribe(suscriber *Client, cmd models.Request) {
-	for _, cn := range cmd.Channels {
-		chn, found := s.channels[cn]
+func (s *Server) handleSuscriptionRequest(suscriber *Client, cmd models.Request) {
+	clientAddress := suscriber.Conn.RemoteAddr().String()
+	s.channelsLock.Lock()
+	for _, channelName := range cmd.Channels {
+		channel, found := s.Channels[channelName]
 		if found {
-			chn.AddClient(suscriber)
+			channel.AddClient(suscriber)
 		} else {
-			newChn := &channel{name: cn, suscribedClients: map[string]*Client{suscriber.Conn.RemoteAddr().String(): suscriber}}
-			s.channels[cn] = newChn
-			log.Printf("New channel: %s", cn)
+			NewChannel := newChannel(channelName)
+			NewChannel.SuscribedClients[clientAddress] = suscriber
+			s.Channels[channelName] = NewChannel
+			log.Printf("New channel: %s", channelName)
 		}
-		log.Printf("Client %s just suscribed to channel %s", (*suscriber).Conn.RemoteAddr().String(), cn)
+		log.Printf("Client %s suscribed to channel %s", clientAddress, channelName)
 	}
+	s.channelsLock.Unlock()
 }
 
-func (s *Server) handleSend(sender *Client, cmd models.Request, contentChan <-chan []byte) {
+func (s *Server) handleFileSendingRequest(sender *Client, req models.Request) {
 	senderAddress := sender.Conn.RemoteAddr().String()
-	cmd.Meta.SenderAddress = senderAddress
-	var contentChans []chan []byte
+	req.Meta.SenderAddress = senderAddress
 
-	for _, destChannel := range cmd.Channels {
-		chn, found := s.channels[destChannel]
-		if !found {
-			//TODO: Inform the client that channel doesn't exist'
-			continue
+	contentChans := s.beginBroadcasting(req, senderAddress)
+
+	if contentChans == nil {
+		s.sendAbortRequest(sender, "channels don't exist")
+		for {
+			select {
+			case <-sender.ContentChan:
+				continue
+			case sender.AbortChan <- true:
+				return
+			}
 		}
-		deliverCmd := models.Request{
-			Method:   CMD_DELIVER,
-			Meta:     models.MetaData{SenderAddress: sender.Conn.RemoteAddr().String(), RequestId: s.newRequestId()},
-			Channels: []string{destChannel},
-			FileInfo: cmd.FileInfo,
-		}
-		channelContentChan := make(chan []byte)
-		go chn.Broadcast(deliverCmd, channelContentChan)
-		contentChans = append(contentChans, channelContentChan)
 	}
-	for i := 0; i < int(cmd.FileInfo.Size); {
-		content := <-contentChan
+
+	for i := 0; i < int(req.FileInfo.Size); {
+		content := <-sender.ContentChan
 		i += len(content)
 		for _, channel := range contentChans {
 			channel <- content
@@ -119,16 +120,51 @@ func (s *Server) handleSend(sender *Client, cmd models.Request, contentChan <-ch
 
 }
 
+func (s *Server) beginBroadcasting(request models.Request, senderAddress string) []chan []byte {
+	var contentChans []chan []byte
+
+	for _, destChannel := range request.Channels {
+		s.channelsLock.RLock()
+		chn, found := s.Channels[destChannel]
+		s.channelsLock.RUnlock()
+		if !found {
+			continue
+		}
+		deliverReq := models.NewDeliverRequest(senderAddress, s.newRequestId(), destChannel, request.FileInfo)
+		channelContentChan := make(chan []byte)
+		go chn.Broadcast(*deliverReq, channelContentChan)
+		contentChans = append(contentChans, channelContentChan)
+	}
+
+	return contentChans
+}
+
 func (s *Server) newRequestId() int64 {
 	s.requestCounter++
 	return s.requestCounter
 }
 
 func (s *Server) disconnectClient(c *Client) {
-	for key, channel := range s.channels {
+	s.channelsLock.Lock()
+	for key, channel := range s.Channels {
 		channel.RemoveClient(c)
-		if len(channel.suscribedClients) < 1 {
-			delete(s.channels, key)
+		if len(channel.SuscribedClients) < 1 {
+			delete(s.Channels, key)
 		}
+	}
+	s.channelsLock.Unlock()
+
+}
+
+func (s *Server) sendAbortRequest(client *Client, msg string) {
+	req := models.NewAbortRequest(msg)
+	reqBytes, err := cftp.SerializeRequest(*req)
+	if err != nil {
+		log.Printf("error serializing abort request: %v", err)
+	}
+
+	err = client.Write(reqBytes)
+	if err != nil {
+		log.Printf("error sending abort request: %v", err)
 	}
 }

@@ -33,7 +33,7 @@ func TestSerializeValidDeliveryWithFileContent(t *testing.T) {
 		Channels: []string{"chn1"},
 		FileInfo: models.File{Name: "testDoc", Ext: "docx", Size: 12017},
 	}
-	expectedBytes := []byte("DELIVER\n{\"SenderAddress\":\"localhost:4567\"}\nchn1\n{\"Name\":\"testDoc\",\"Ext\":\"docx\",\"Size\":12017}\x04")
+	expectedBytes := []byte("DELIVER\n{\"SenderAddress\":\"localhost:4567\",\"RequestId\":0,\"Message\":\"\"}\nchn1\n{\"Name\":\"testDoc\",\"Ext\":\"docx\",\"Size\":12017}\x04")
 
 	//when
 	actualBytes, err := SerializeRequest(inputCommand)

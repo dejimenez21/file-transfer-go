@@ -8,6 +8,7 @@ import (
 type metaData struct {
 	SenderAddress string
 	RequestId     int
+	Message       string
 }
 
 type request struct {

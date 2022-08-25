@@ -12,17 +12,19 @@ import (
 
 type Client struct {
 	Conn        net.Conn
-	CmdChan     chan models.Request
+	RequestChan chan models.Request
 	ContentChan chan []byte
 	Disconnect  chan *Client
+	AbortChan   chan bool
 }
 
 func newClient(conn net.Conn) *Client {
 	return &Client{
 		Conn:        conn,
-		CmdChan:     make(chan models.Request),
+		RequestChan: make(chan models.Request),
 		ContentChan: make(chan []byte),
 		Disconnect:  make(chan *Client),
+		AbortChan:   make(chan bool),
 	}
 }
 
@@ -40,7 +42,7 @@ func (c *Client) ReadRequest() {
 		if err != nil {
 			log.Printf("Error deserializing message: %v", err)
 		}
-		c.CmdChan <- cmd
+		c.RequestChan <- cmd
 
 		if cmd.Method == models.REQ_SEND {
 			for i := 0; i < int(cmd.FileInfo.Size); {
@@ -51,7 +53,20 @@ func (c *Client) ReadRequest() {
 					return
 				}
 				i += len(contentData)
-				c.ContentChan <- contentData
+				select {
+				case <-c.AbortChan:
+					for {
+						_, err := c.Conn.Read(data)
+						if err != nil {
+							log.Printf("Client %v disconected", c.Conn.RemoteAddr())
+							c.Disconnect <- c
+							return
+						}
+					}
+				default:
+					c.ContentChan <- contentData
+
+				}
 			}
 		}
 	}

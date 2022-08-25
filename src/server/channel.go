@@ -8,24 +8,31 @@ import (
 	"sync"
 )
 
-type channel struct {
-	name                 string
-	suscribedClients     map[string]*Client
+type Channel struct {
+	Name                 string
+	SuscribedClients     map[string]*Client
 	suscribedClientsLock sync.RWMutex
 }
 
-func (c *channel) AddClient(newClient *Client) {
+func newChannel(name string) *Channel {
+	return &Channel{
+		Name:             name,
+		SuscribedClients: make(map[string]*Client),
+	}
+}
+
+func (c *Channel) AddClient(newClient *Client) {
 	c.suscribedClientsLock.Lock()
-	c.suscribedClients[newClient.Conn.RemoteAddr().String()] = newClient
+	c.SuscribedClients[newClient.Conn.RemoteAddr().String()] = newClient
 	c.suscribedClientsLock.Unlock()
 }
 
-func (c *channel) Broadcast(cmd models.Request, contentChan chan []byte) {
-	log.Printf("Broadcasting file from %s through %s", cmd.Meta.SenderAddress, c.name)
+func (c *Channel) Broadcast(cmd models.Request, contentChan chan []byte) {
+	log.Printf("Broadcasting file from %s through %s", cmd.Meta.SenderAddress, c.Name)
 	clients := c.copySuscribedClients()
 	cftpBytes, err := cftp.SerializeRequest(cmd)
 	if err != nil {
-		err = fmt.Errorf("error serializing %s delivery throug %s for : %v", cmd.FileInfo.Name, c.name, err)
+		err = fmt.Errorf("error serializing %s delivery throug %s for : %v", cmd.FileInfo.Name, c.Name, err)
 		log.Println(err)
 		return
 	}
@@ -50,16 +57,16 @@ func (c *channel) Broadcast(cmd models.Request, contentChan chan []byte) {
 
 }
 
-func (c *channel) RemoveClient(client *Client) {
+func (c *Channel) RemoveClient(client *Client) {
 	c.suscribedClientsLock.Lock()
-	delete(c.suscribedClients, client.Conn.RemoteAddr().String())
+	delete(c.SuscribedClients, client.Conn.RemoteAddr().String())
 	c.suscribedClientsLock.Unlock()
 }
 
-func (c *channel) copySuscribedClients() map[string]*Client {
+func (c *Channel) copySuscribedClients() map[string]*Client {
 	copy := make(map[string]*Client)
 	c.suscribedClientsLock.RLock()
-	for k, v := range c.suscribedClients {
+	for k, v := range c.SuscribedClients {
 		copy[k] = v
 	}
 	c.suscribedClientsLock.RUnlock()

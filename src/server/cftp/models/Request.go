@@ -19,3 +19,12 @@ func NewAbortRequest(msg string) *Request {
 		Meta:   MetaData{Message: msg},
 	}
 }
+
+func NewDeliverRequest(senderAddress string, requestId int64, channel string, fileInfo File) *Request {
+	return &Request{
+		Method:   REQ_DELIVER,
+		Meta:     MetaData{SenderAddress: senderAddress, RequestId: requestId},
+		Channels: []string{channel},
+		FileInfo: fileInfo,
+	}
+}

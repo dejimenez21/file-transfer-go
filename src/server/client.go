@@ -68,6 +68,7 @@ func (c *Client) StartWriter() {
 		}
 	}
 	c.Disconnect <- c
+	//TODO: when sending a file notify de channel to stop writing to this chan.
 }
 
 func (c *Client) readFileContent(bufSize int, reader *bufio.Reader) (data []byte, err error) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"net"
 	"server/cftp"
@@ -13,7 +14,6 @@ type Client struct {
 	Conn        net.Conn
 	CmdChan     chan models.Request
 	ContentChan chan []byte
-	WriteChan   chan []byte
 	Disconnect  chan *Client
 }
 
@@ -22,7 +22,6 @@ func newClient(conn net.Conn) *Client {
 		Conn:        conn,
 		CmdChan:     make(chan models.Request),
 		ContentChan: make(chan []byte),
-		WriteChan:   make(chan []byte),
 		Disconnect:  make(chan *Client),
 	}
 }
@@ -58,17 +57,13 @@ func (c *Client) ReadRequest() {
 	}
 }
 
-func (c *Client) StartWriter() {
-	for {
-		msg := <-c.WriteChan
-		_, err := c.Conn.Write(msg)
-		if err != nil {
-			log.Println(err)
-			break
-		}
+func (c *Client) Write(bytes []byte) error {
+	_, err := c.Conn.Write(bytes)
+	if err != nil {
+		c.Disconnect <- c
+		return fmt.Errorf("Client %v disconected: %v", c.Conn.RemoteAddr(), err)
 	}
-	c.Disconnect <- c
-	//TODO: when sending a file notify de channel to stop writing to this chan.
+	return nil
 }
 
 func (c *Client) readFileContent(bufSize int, reader *bufio.Reader) (data []byte, err error) {

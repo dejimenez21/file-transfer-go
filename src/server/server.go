@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"server/cftp"
 	"server/cftp/models"
 )
 
 const (
-	CMD_SEND            = "send"
-	CMD_DELIVER         = "deliver"
-	CMD_SUSCRIBE        = "suscribe"
 	DEFAULT_BUFFER_SIZE = 1024
 )
 
@@ -66,9 +64,9 @@ func (s *Server) handleConnection(conn net.Conn) {
 func (s *Server) handleCommand(client *Client, cmd models.Request, contentChan <-chan []byte) {
 
 	switch cmd.Method {
-	case CMD_SUSCRIBE:
+	case models.REQ_SUSCRIBE:
 		s.handleSuscribe(client, cmd)
-	case CMD_SEND:
+	case models.REQ_SEND:
 		s.handleSend(client, cmd, contentChan)
 	}
 }
@@ -95,11 +93,10 @@ func (s *Server) handleSend(sender *Client, cmd models.Request, contentChan <-ch
 	for _, destChannel := range cmd.Channels {
 		chn, found := s.channels[destChannel]
 		if !found {
-			//TODO: Inform the client that channel doesn't exist'
 			continue
 		}
 		deliverCmd := models.Request{
-			Method:   CMD_DELIVER,
+			Method:   models.REQ_DELIVER,
 			Meta:     models.MetaData{SenderAddress: sender.Conn.RemoteAddr().String(), RequestId: s.newRequestId()},
 			Channels: []string{destChannel},
 			FileInfo: cmd.FileInfo,
@@ -108,6 +105,12 @@ func (s *Server) handleSend(sender *Client, cmd models.Request, contentChan <-ch
 		go chn.Broadcast(deliverCmd, channelContentChan)
 		contentChans = append(contentChans, channelContentChan)
 	}
+
+	if contentChans == nil {
+		sendAbortRequest(sender, "channels don't exist")
+		return
+	}
+
 	for i := 0; i < int(cmd.FileInfo.Size); {
 		content := <-contentChan
 		i += len(content)
@@ -129,5 +132,18 @@ func (s *Server) disconnectClient(c *Client) {
 		if len(channel.suscribedClients) < 1 {
 			delete(s.channels, key)
 		}
+	}
+}
+
+func sendAbortRequest(client *Client, msg string) {
+	req := models.NewAbortRequest(msg)
+	reqBytes, err := cftp.SerializeRequest(*req)
+	if err != nil {
+		log.Printf("error serializing abort request: %v", err)
+	}
+
+	err = client.Write(reqBytes)
+	if err != nil {
+		log.Printf("error sending abort request: %v", err)
 	}
 }

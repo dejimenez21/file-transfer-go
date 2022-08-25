@@ -23,7 +23,7 @@ func (c *channel) AddClient(newClient *Client) {
 func (c *channel) Broadcast(cmd models.Request, contentChan chan []byte) {
 	log.Printf("Broadcasting file from %s through %s", cmd.Meta.SenderAddress, c.name)
 	clients := c.copySuscribedClients()
-	cftpBytes, err := cftp.SerializeCommand(cmd)
+	cftpBytes, err := cftp.SerializeRequest(cmd)
 	if err != nil {
 		err = fmt.Errorf("error serializing %s delivery throug %s for : %v", cmd.FileInfo.Name, c.name, err)
 		log.Println(err)

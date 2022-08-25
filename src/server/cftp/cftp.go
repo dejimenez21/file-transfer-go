@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func DeserializeCommand(commandString string) (cmd models.Request, err error) {
+func DeserializeRequest(commandString string) (cmd models.Request, err error) {
 	args := strings.SplitN(commandString, "\n", 4)
 	method := args[0]
 	var meta models.MetaData
@@ -32,7 +32,7 @@ func DeserializeCommand(commandString string) (cmd models.Request, err error) {
 	return cmd, err
 }
 
-func SerializeCommand(cmd models.Request) (cftpBytes []byte, err error) {
+func SerializeRequest(cmd models.Request) (cftpBytes []byte, err error) {
 	method := cmd.Method
 	metaBytes, err := json.Marshal(cmd.Meta)
 	if err != nil {
@@ -50,7 +50,7 @@ func SerializeCommand(cmd models.Request) (cftpBytes []byte, err error) {
 
 	cftpString := strings.Join([]string{method, meta, channels, fileInfo}, "\n")
 	cftpBytes = []byte(cftpString)
-	cftpBytes = append(cftpBytes, END_OF_MSG)
+	cftpBytes = append(cftpBytes, models.END_OF_MSG)
 	return
 }
 

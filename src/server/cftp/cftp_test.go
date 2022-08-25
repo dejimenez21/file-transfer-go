@@ -17,7 +17,7 @@ func TestDeserializeValidCommandWithFileContent(t *testing.T) {
 	}
 
 	//when
-	actualCommand, err := DeserializeCommand(inputString)
+	actualCommand, err := DeserializeRequest(inputString)
 
 	//then
 	if !reflect.DeepEqual(actualCommand, expectedCommand) || err != nil {
@@ -36,7 +36,7 @@ func TestSerializeValidDeliveryWithFileContent(t *testing.T) {
 	expectedBytes := []byte("DELIVER\n{\"SenderAddress\":\"localhost:4567\"}\nchn1\n{\"Name\":\"testDoc\",\"Ext\":\"docx\",\"Size\":12017}\x04")
 
 	//when
-	actualBytes, err := SerializeCommand(inputCommand)
+	actualBytes, err := SerializeRequest(inputCommand)
 
 	//then
 	if !reflect.DeepEqual(actualBytes, expectedBytes) || err != nil {

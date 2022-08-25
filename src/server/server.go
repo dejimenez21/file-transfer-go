@@ -60,7 +60,6 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 		}
 	}(client)
-	go client.StartWriter()
 	client.ReadRequest()
 }
 

@@ -30,7 +30,7 @@ func (c *channel) Broadcast(cmd models.Request, contentChan chan []byte) {
 		return
 	}
 	for _, client := range clients {
-		client.WriteChan <- cftpBytes
+		client.Write(cftpBytes)
 	}
 	var chunkSeq int64 = 0
 	deliveryID := cmd.Meta.RequestId
@@ -40,7 +40,11 @@ func (c *channel) Broadcast(cmd models.Request, contentChan chan []byte) {
 		del := models.Delivery{Content: fileContent, ID: deliveryID, Seq: chunkSeq, Size: len(fileContent)}
 		deliveryBytes := cftp.SerializeChunkDelivery(del)
 		for _, client := range clients {
-			client.WriteChan <- deliveryBytes
+			err := client.Write(deliveryBytes)
+			if err != nil {
+				log.Printf("error sending chunk to client: %v", err)
+				delete(clients, client.Conn.RemoteAddr().String())
+			}
 		}
 	}
 
